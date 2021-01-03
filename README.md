@@ -12,6 +12,12 @@ I am calling it a tub because it needs a name and tub is short and sounds concre
 
 This thing has the dockerfile with all the scripts you need to create it and directory called the workspace. The workspace is a shared folder between the docker host and the docker guest(?). This is the tubvolume. This workspace will contain stuff that is shared that you want to make persistent and all the catkin worspace. The catkin_ws should be submoduled into the tub repo.
 
+I find it useful to have notebooks so you can use jupyter. So maybe another shared directory is notebooks.
+
+## Other shares
+
+For some of the stuff I was doing it was convenient to have a shared folder for datasets. I don't think this is the final solution here, but I am using it like this and it seems to make sense. I've made this a samba share and mount it to every ros docker container. 
+
 # TO-DOs:
 
 

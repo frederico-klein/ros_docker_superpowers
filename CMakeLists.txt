@@ -153,6 +153,10 @@ include_directories(
 #   ${catkin_LIBRARIES}
 # )
 
+##this does not make a lot of sense to be added here. it needs to be added on a per_package basis.
+
+#add_custom_target()
+
 #############
 ## Install ##
 #############
