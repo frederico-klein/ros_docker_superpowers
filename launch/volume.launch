@@ -1,0 +1,5 @@
+<launch>
+  <node name="" pkg="ros_docker_superpowers" type="cr_volume.py" output="screen"/>
+  <node name="docker_master" pkg="ros_docker_superpowers" type="docker_master.py" output="screen"/>
+
+</launch>
