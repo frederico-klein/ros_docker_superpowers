@@ -5,8 +5,8 @@ import time
 import rospy
 import rosnode
 import rosparam
-from ros_docker_superpowers.srv import addVolume, addVolumeResponse
-from ros_docker_superpowers.srv import RmVolume, RmVolumeResponse
+from rosdop.srv import addVolume, addVolumeResponse
+from rosdop.srv import RmVolume, RmVolumeResponse
 
 class Error(Exception):
     """Base class for exceptions in this module."""
