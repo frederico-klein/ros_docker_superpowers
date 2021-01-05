@@ -8,7 +8,9 @@
 import rospy
 import subprocess
 from docker_master import DockerMasterInterface as DMI
-from utils import attribute_from_param_setter as afps
+#from utils import attribute_from_param_setter as afps
+#from utils import logged_subprocess_popen as lspPopen
+from utils import DockerLogged
 
 # class TubVolumeInterface():
 #     def __init__(self):
@@ -22,7 +24,7 @@ from utils import attribute_from_param_setter as afps
 #                     return node
 #         pass
 
-class TubVolume():
+class TubVolume(DockerLogged):
     """
     This is a vieux sshfs wrapper. I am calling it tub volume because it will mount always in the same path in a docker host thing (which I am calling a Tub)
     This can be invoked with something like:
@@ -43,7 +45,7 @@ class TubVolume():
         username="frederico",
         sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
         identity_file="/root/.ssh/id_rsa",
-        tub_path = "/home/frederico/whole_lavine/tub/Tch", ##no idea how to set this correctly
+        tub_path = "./", ##no idea how to set this correctly, probably only as a param
         ws_path = "/workspace/workspace"
         ):
         rospy.init_node('docker_volume', anonymous=True, log_level=rospy.DEBUG)
@@ -60,9 +62,9 @@ class TubVolume():
 
         ##Now I will register myself with the master
         #rospy.get_param("{}/TubVolumeDic".format(self.master))
-        rospy.loginfo("Hello")
+        rospy.logdebug("Added DMI OK.")
         self.DMI.addVolume(self.Name, self.WsPath)
-        rospy.loginfo("Hello")
+        rospy.loginfo("Added volume to DMI OK.")
 
     def open(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
@@ -82,47 +84,50 @@ class TubVolume():
         # self.TubPath = rospy.get_param('~tub_path', default = self.TubPath)
         # rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~tub_path'), self.TubPath)
 
-        afps(self,"name","Name")
-        afps(self,"username","UserName")
-        afps(self,"identity_file","IdentityFile")
-        afps(self,"sshfs_hostname","SshfsHostname")
-        afps(self,"tub_path","TubPath")
+        self.afps("Name", "name")
+        self.afps("UserName", "username")
+        self.afps("IdentityFile", "identity_file")
+        self.afps("SshfsHostname", "sshfs_hostname")
+        self.afps("TubPath", "tub_path")
 
         rospy.loginfo("Creating volume {}".format(self.Name))
         ##check if there is a volume already
-        proc = subprocess.Popen(['docker','volume','ls'], stdout=subprocess.PIPE)
-        output = proc.stdout.read()
+
+        #proc = subprocess.Popen(['docker','volume','ls'], stdout=subprocess.PIPE)
+        #output = proc.stdout.read()
+        output = self.lspPopen(['docker','volume','ls'])[0]
 
         if self.Name in output: #if there isn't create one
             rospy.loginfo("found {} docker volume.".format(self.Name))
         else:
             # I am unsure about this.
             list_args = [
-            "docker","volume","create",
-            "-d",self.Driver,
-            "-o","sshcmd={}@{}:{}".format(self.UserName,
-            self.SshfsHostname, self.TubPath),
-            "-o","IdentityFile={}".format(self.IdentityFile),
-            #"-o","password={}".format("some_elusive_password"),
-            self.Name]
-            rospy.logdebug("command being run:{}".format(list_args))
-            procTubVolumeCreate = subprocess.Popen(list_args, stdout=subprocess.PIPE)
+                "docker","volume","create",
+                "-d",self.Driver,
+                "-o","sshcmd={}@{}:{}".format(self.UserName,
+                self.SshfsHostname, self.TubPath),
+                "-o","IdentityFile={}".format(self.IdentityFile),
+                #"-o","password={}".format("some_elusive_password"),
+                self.Name]
+            #rospy.logdebug("command being run:{}".format(list_args))
+            #procTubVolumeCreate = subprocess.Popen(list_args, stdout=subprocess.PIPE)
+            self.lspPopen(list_args)
 
         rospy.on_shutdown(self.close)
 
     def close(self):
         rospy.loginfo("Shutting down. Deleting volume {}".format(self.Name))
         self.DMI.rmVolume(self.Name)
-        procDel = subprocess.Popen(['docker','volume','rm',self.Name], stdout=subprocess.PIPE)
+        self.lspPopen(['docker','volume','rm',self.Name])
 
 if __name__ == '__main__':
     try:
         myTubVolume = TubVolume(
-                name="sacudo9999",
+                name="tubvolume0",
                 username="frederico",
                 sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
                 identity_file="/root/.ssh/id_rsa",
-                tub_path = "/home/frederico/whole_lavine/tub/Tch", ##no idea how to set this correctly
+                tub_path = "/home/frederico/whole_lavine/catkin_docker/src/dop_tch", ##no idea how to set this correctly
                 ws_path = "/workspace/workspace"
                 )
         myTubVolume.open()

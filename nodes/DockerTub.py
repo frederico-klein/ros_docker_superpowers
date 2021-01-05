@@ -6,11 +6,10 @@
 ## creates the bridge.
 
 import rospy
-import subprocess
-from utils import attribute_from_param_setter as afps
+from utils import DockerLogged
 from docker_master import DockerMasterInterface as DMI
 
-class Tub():
+class Tub(DockerLogged):
     """
     This can be invoked with something like:
     from DockerTub import Tub
@@ -23,13 +22,13 @@ class Tub():
 
     """
     def __init__(self,
-            name="tub0",
-            network_name="br0",
-            imagename="tch_new",
-            tub_volume="tubvolume0",
-            hostname="torch_machine4",
-            dockerfile_directory=".",
-            machineip="172.28.6.31"):
+            name=                   "tub0"          ,
+            imagename=              "tch_new"       ,
+            network_name=           "br0"           ,
+            tub_volume=             "tubvolume0"    ,
+            hostname=               "torch_machine4",
+            dockerfile_directory=   "."             ,
+            machineip=              "172.28.6.31"   ):
         self.Name = name
         self.NetworkName = network_name
         self.ImageName = imagename
@@ -44,39 +43,39 @@ class Tub():
     def updateBuild(self):
         ## this no longer works for some builds where I wanted nvidia to be present during the build to detect the graphics card and know what to do. I am not 100% sure it ever worked, so it is a maybe on the todo list
         rospy.loginfo("Starting build process...")
-        proc = subprocess.Popen(['docker','build',"-t",
-        self.ImageName,
-        self.DockerfileDirectory
-        ], stdout=subprocess.PIPE)
+        self.lspPopen(['docker','build',"-t",
+            self.ImageName,
+            self.DockerfileDirectory
+            ])
 
     def create(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
         ## this is the best I could do with python 2.7 and my python fu
 
-        afps(self,"name","Name")
-        afps(self,"imagename","ImageName")
-        afps(self,"network_name","NetworkName")
-        afps(self,"tub_volume","TubVolume")
+        self.afps("Name"        ,"name"          )
+        self.afps("ImageName"   ,"imagename"     )
+        self.afps("NetworkName" ,"network_name"  )
+        self.afps("TubVolume"   ,"tub_volume"    )
+        self.afps("MachineHostname"    ,"hostname")
 
         ###here I need to get the TubVolume's properies.
         self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume)
         #self.Display = ":0"
 
-        afps(self,"dockerfile_directory","DockerfileDirectory")
-        afps(self,"machineip","IP")
+        self.afps("DockerfileDirectory"  , "dockerfile_directory")
+        self.afps("IP"                   , "machineip"           )
 
         rospy.loginfo("Mounting docker image {}".format(self.Name))
 
         ##check if there is a volume already
-        proc = subprocess.Popen(['docker','ps'], stdout=subprocess.PIPE)
-        output = proc.stdout.read()
+        output = self.oLspPopen(['docker','ps'])
 
         if self.Name in output: #if there isn't create one
-            rospy.loginfo("found {} docker image.".format(self.Name))
+            rospy.logwarn("found {} docker container found.".format(self.Name))
         else:
 
             ## I guess it cant be interactive this time. for interaction we will rely on sshd working
-            rospy.loginfo("Hello")
+            rospy.loginfo("Docker container not found. Creating one. ")
             proc_list = ['docker','run',"--gpus",'"device=0"',
                  #"--rm",
                  #"-it",
@@ -93,22 +92,15 @@ class Tub():
                  self.ImageName,
                  "bash"
              ]
-            rospy.logdebug(proc_list)
-            proc = subprocess.Popen(proc_list, stdout=subprocess.PIPE)
-            output = proc.stdout.read()
-            rospy.logdebug(output)
+            self.lspPopen(proc_list)
         rospy.on_shutdown(self.close)
 
     def close(self):
         rospy.loginfo("Shutting down. Stopping container {}".format(self.Name))
         ##docker stop kill or rm???
-        procstop = subprocess.Popen(['docker','stop',self.Name], stdout=subprocess.PIPE)
-        outputstop = procstop.stdout.read()
-        rospy.logdebug(outputstop)
+        self.lspPopen(['docker','stop',self.Name])
         rospy.loginfo("Deleting container {}".format(self.Name))
-        procDel = subprocess.Popen(['docker','rm',self.Name], stdout=subprocess.PIPE)
-        outputDel = procDel.stdout.read()
-        rospy.logdebug(outputDel)
+        self.lspPopen(['docker','rm',self.Name])
 
 if __name__ == '__main__':
     try:

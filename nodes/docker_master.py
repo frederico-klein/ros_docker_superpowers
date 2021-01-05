@@ -36,9 +36,22 @@ class DockerMasterInterface():
                 self.rm_vol = rospy.ServiceProxy('{}/rm_volume'.format(self.master_handle), RmVolume)
 
             except rospy.ServiceException as e:
-                print("Service call failed: %s"%e)
+                rospy.logfatal("Service call failed: %s"%e)
+
+        rospy.loginfo("DMI init OK. ")
 
     def get_ws_volume_by_name(self,name):
+        ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
+        tries = 10
+        while tries >0:
+
+            if len(self.master.TubVolumeDic) != 0 and name in self.master.TubVolumeDic:
+                break
+            else:
+                tries -= 1
+                rospy.logwarn("Volume List is empty or does not contain desired volume. Have you mounted a volume yet?")
+                time.sleep(3)
+
         return self.master.TubVolumeDic[name]
 
     def get_master(self):
@@ -50,7 +63,7 @@ class DockerMasterInterface():
                     return node
             else:
                 tries -= 1
-                rospy.loginfo("Retry {}".format(tries))
+                rospy.logwarn("Docker Master not found yet. Is it running? Will retry {} more times.".format(tries))
                 time.sleep(0.3)
 
         if "docker_master" not in rosnode.get_node_names():
