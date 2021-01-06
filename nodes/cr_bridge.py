@@ -65,7 +65,9 @@ class DockerBridge(DockerLogged):
                 "--gateway={}".format(self.Gateway),
                 self.Name]
             self.lspPopen(list_args)
-    def __del__(self):
+            rospy.on_shutdown(self.close)
+
+    def close(self):
         rospy.loginfo("Shutting down. Deleting bridge {}".format(self.Name))
         self.lspPopenRetry(['docker','network','rm',self.Name])
 

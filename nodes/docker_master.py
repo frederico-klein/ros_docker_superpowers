@@ -41,16 +41,21 @@ class DockerMasterInterface():
         rospy.loginfo("DMI init OK. ")
 
     def get_ws_volume_by_name(self,name):
-        ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
-        tries = 10
-        while tries >0:
 
-            if len(self.master.TubVolumeDic) != 0 and name in self.master.TubVolumeDic:
-                break
-            else:
-                tries -= 1
-                rospy.logwarn("Volume List is empty or does not contain desired volume. Have you mounted a volume yet?")
-                time.sleep(3)
+        try:
+            ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
+            tries = 10
+            while tries >0:
+                ###It doesnt make sense not to update this. Idk what I was thinking
+                self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
+                if len(self.master.TubVolumeDic) != 0 and name in self.master.TubVolumeDic:
+                    break
+                else:
+                    tries -= 1
+                    rospy.logwarn("Volume List is empty or does not contain desired volume. Have you mounted a volume yet?")
+                    time.sleep(3)
+        except rospy.ROSException as e:
+            rospy.logerr("Unexpected! {}".format(e))
 
         return self.master.TubVolumeDic[name]
 
@@ -111,7 +116,9 @@ class DockerMaster():
 
     def handle_add_volume(self,req):
         rospy.loginfo("Adding Volume {}:{} to list".format(req.VolumeName,  req.WsPath))
+        rospy.logdebug("Current volume dictionary: before adding %s"%(self.TubVolumeDic))
         self.TubVolumeDic[req.VolumeName] = req.WsPath
+        rospy.logdebug("Current volume dictionary: %s"%(self.TubVolumeDic))
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         return addVolumeResponse()
 
