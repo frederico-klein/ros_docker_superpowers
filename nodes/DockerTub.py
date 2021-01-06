@@ -29,6 +29,7 @@ class Tub(DockerLogged):
             hostname=               "torch_machine4",
             dockerfile_directory=   "."             ,
             machineip=              "172.28.6.31"   ):
+        super(Tub, self).__init__()
         self.Name = name
         self.NetworkName = network_name
         self.ImageName = imagename
@@ -96,11 +97,27 @@ class Tub(DockerLogged):
         rospy.on_shutdown(self.close)
 
     def close(self):
-        rospy.loginfo("Shutting down. Stopping container {}".format(self.Name))
-        ##docker stop kill or rm???
-        self.lspPopen(['docker','stop',self.Name])
-        rospy.loginfo("Deleting container {}".format(self.Name))
-        self.lspPopen(['docker','rm',self.Name])
+        rospy.loginfo("Starting shutting down sequence for {}.".format(self.Name))
+
+        output = self.oLspPopen(['docker','ps'])
+
+        if self.Name in output: #if there isn't create one
+            rospy.loginfo("Found {} docker container found to be running. Now stopping... ".format(self.Name))
+            ##docker stop kill or rm???
+            self.lspPopenRetry(['docker','stop',self.Name])
+            rospy.loginfo("Stop okay.")
+        else:
+            rospy.logerr("Docker container {} already closed!! There are issues with the container initialization or persistence.".format(self.Name))
+
+        output = self.oLspPopen(['docker','container','ls','-a'])
+
+        if self.Name in output: #if there isn't create one
+            rospy.loginfo("Found {} docker container found. Now deleting... ".format(self.Name))
+            ##docker stop kill or rm???
+            self.lspPopenRetry(['docker','rm',self.Name])
+            rospy.loginfo("Delete okay. Bye!")
+        else:
+            rospy.logerr("Unexpected. Docker container {} already deleted.".format(self.Name))
 
 if __name__ == '__main__':
     try:

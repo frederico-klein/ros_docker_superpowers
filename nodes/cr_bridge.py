@@ -25,6 +25,7 @@ class DockerBridge(DockerLogged):
             subnet= "172.28.0.0/16" ,
             iprange="172.28.6.0/24" ,
             gateway="172.28.6.254"  ):
+        super(DockerBridge, self).__init__()
         self.Name = name
         self.Driver = "bridge"
         self.Subnet = subnet
@@ -66,7 +67,7 @@ class DockerBridge(DockerLogged):
             self.lspPopen(list_args)
     def __del__(self):
         rospy.loginfo("Shutting down. Deleting bridge {}".format(self.Name))
-        self.lspPopen(['docker','network','rm',self.Name])
+        self.lspPopenRetry(['docker','network','rm',self.Name])
 
 if __name__ == '__main__':
     try:

@@ -110,7 +110,7 @@ class DockerMaster():
         rospy.on_shutdown(self.close)
 
     def handle_add_volume(self,req):
-        rospy.loginfo("Adding Volume {} to list".format(req.VolumeName))
+        rospy.loginfo("Adding Volume {}:{} to list".format(req.VolumeName,  req.WsPath))
         self.TubVolumeDic[req.VolumeName] = req.WsPath
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         return addVolumeResponse()

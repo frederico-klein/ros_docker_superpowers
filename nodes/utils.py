@@ -5,10 +5,10 @@ import rospy
 import subprocess
 #import re
 
-class DockerLogged():
+class DockerLogged(object):
 
     def __init__(self):
-        proc_list = []
+        self.proc_list = []
 
         rospy.on_shutdown(self.__ultraclose)
 
@@ -27,21 +27,37 @@ class DockerLogged():
         # I want to keep this updated because I will use these attributes for interprocess talk. it's just easier like this.
         rospy.set_param('~{}'.format(private_name), updated_param)
 
-    def lspPopen(self, list_args):
+    def lspPopen(self, list_args, with_retries=False, num_retries = 1):
         """
         old logged_subprocess_popen
         """
-        proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        res = proc.communicate(timeout=15)
-        rospy.logdebug("command being run:{}".format(list_args))
-        # output = proc.stdout.read()
-        output = res[0]
-        errorout = res[1] # I think
+        tries = num_retries
+        while tries>0:
+            proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            res = proc.communicate()
+            rospy.logdebug("command being run:{}".format(list_args))
+            # output = proc.stdout.read()
+            output = res[0]
+            errorout = res[1] # I think
+            tries-=1
+            if with_retries:
+                if proc.returncode is 0:
+                    break
+                else:
+                    rospy.logdebug("COMMAND: {} Did not work yet. Maybe try again in a sec?".format(list_args))
+            else:
+                break
+            rospy.sleep(1)
+
         if proc.returncode is not 0:
             rospy.logerr(errorout)
+            rospy.signal_shutdown(errorout)
         rospy.logdebug("output:\n{}".format(output))
-        proc_list.append(proc)
+        self.proc_list.append(proc)
         return (output, proc) ### i probably should catch all of those procs and kill them in the end.
+
+    def lspPopenRetry(self, list_args, num_retries=10):
+        return self.lspPopen(list_args, with_retries=True, num_retries=num_retries)
 
     def oLspPopen(self, list_args):
         return self.lspPopen(list_args)[0]
@@ -49,4 +65,7 @@ class DockerLogged():
     def __ultraclose(self):
         for proc in self.proc_list:
             ## they should be dead already
-            proc.kill()
+            try:
+                proc.kill()
+            except:
+                pass

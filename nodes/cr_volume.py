@@ -41,15 +41,16 @@ class TubVolume(DockerLogged):
 
     """
     def __init__(self,
-        name="sshvolume-workspace-torch_new899",
-        username="frederico",
-        sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
-        identity_file="/root/.ssh/id_rsa",
-        tub_path = "./", ##no idea how to set this correctly, probably only as a param
-        ws_path = "/workspace/workspace"
-        ):
+            name="sshvolume-workspace-torch_new899",
+            username="frederico",
+            sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
+            identity_file="/root/.ssh/id_rsa",
+            tub_path = "./", ##no idea how to set this correctly, probably only as a param
+            ws_path = "/workspace"
+            ):
+        super(TubVolume, self).__init__()
         rospy.init_node('docker_volume', anonymous=True, log_level=rospy.DEBUG)
-        rospy.loginfo("Hello")
+        rospy.loginfo("Docker Volume spawner node started. ")
         self.Name = name
         self.Driver = "vieux/sshfs"
         self.UserName = username
@@ -63,8 +64,6 @@ class TubVolume(DockerLogged):
         ##Now I will register myself with the master
         #rospy.get_param("{}/TubVolumeDic".format(self.master))
         rospy.logdebug("Added DMI OK.")
-        self.DMI.addVolume(self.Name, self.WsPath)
-        rospy.loginfo("Added volume to DMI OK.")
 
     def open(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
@@ -89,6 +88,10 @@ class TubVolume(DockerLogged):
         self.afps("IdentityFile", "identity_file")
         self.afps("SshfsHostname", "sshfs_hostname")
         self.afps("TubPath", "tub_path")
+        self.afps("WsPath", "ws_path")
+
+        self.DMI.addVolume(self.Name, self.WsPath)
+        rospy.loginfo("Added volume to DMI OK.")
 
         rospy.loginfo("Creating volume {}".format(self.Name))
         ##check if there is a volume already
@@ -118,7 +121,7 @@ class TubVolume(DockerLogged):
     def close(self):
         rospy.loginfo("Shutting down. Deleting volume {}".format(self.Name))
         self.DMI.rmVolume(self.Name)
-        self.lspPopen(['docker','volume','rm',self.Name])
+        self.lspPopenRetry(['docker','volume','rm',self.Name])
 
 if __name__ == '__main__':
     try:
@@ -128,7 +131,7 @@ if __name__ == '__main__':
                 sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
                 identity_file="/root/.ssh/id_rsa",
                 tub_path = "/home/frederico/whole_lavine/catkin_docker/src/dop_tch", ##no idea how to set this correctly
-                ws_path = "/workspace/workspace"
+                ws_path = "/workspace"
                 )
         myTubVolume.open()
         rospy.spin()
