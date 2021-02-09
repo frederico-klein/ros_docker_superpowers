@@ -27,7 +27,7 @@ else
   ## I need to authorize myself
 
   KEY=$(cat ~/.ssh/id_rsa.pub)
-  if [ -z \"\$(grep \"$KEY\" ~/.ssh/authorized_keys )\" ]
+  if [ -z '$(grep "$KEY" ~/.ssh/authorized_keys )' ]
   then
     echo $KEY >> ~/.ssh/authorized_keys
     echo key added.
@@ -36,12 +36,6 @@ else
   ## Now you need to be using the authorized_keys list, otherwise this will not work.
 
   sudo cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup --backup
-  ## This may fail with double quotes instead of single and the $0 instead of
-  ## keys.sh, specially if this file is renamed to have like and underscore or
-  ## something else that sed doesn't like
-  ## old line
-  #sed -i 's/[\s#]*AuthorizedKeysFile\s*(\s*.ssh\/authorized_keys )*/## Modified by dop_tch\/keys.sh ##\nAuthorizedKeysFile .ssh\/authorized_keys /' -r /etc/ssh/sshd_config
-  SEDEXPRESSION="s/[\s#]*AuthorizedKeysFile\s*(\s*.ssh\/authorized_keys )*/## Modified by dop_tch\/$0 ##\nAuthorizedKeysFile .ssh\/authorized_keys /"
-  sed -i $SEDEXPRESSION -r /etc/ssh/sshd_config
+  sudo sed -i 's/[\s#]*AuthorizedKeysFile\s*(\s*.ssh\/authorized_keys )*/## Modified by dop_tch\/keys.sh ##\nAuthorizedKeysFile .ssh\/authorized_keys /' -r /etc/ssh/sshd_config
   sudo service ssh restart
 fi
