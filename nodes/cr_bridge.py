@@ -14,7 +14,7 @@ class DockerBridge(DockerLogged):
     This can be invoked with something like:
     from cr_bridge import DockerBridge
 
-    myDockerBridge = DockerBridge(name="br0",subnet="172.28.0.0/16",iprange="172.28.6.0/24",gateway="172.28.6.254")
+    myDockerBridge = DockerBridge(name="br0",subnet="172.28.0.0/16",iprange="172.28.5.0/24",gateway="172.28.5.254")
     myDockerBridge.create()
 
     or launched as a node with parameters from a launch file, with the same names.
@@ -23,15 +23,15 @@ class DockerBridge(DockerLogged):
     def __init__(self,
             name=   "br0"           ,
             subnet= "172.28.0.0/16" ,
-            iprange="172.28.6.0/24" ,
-            gateway="172.28.6.254"  ):
+            iprange="172.28.5.0/24" ,
+            gateway="172.28.5.254"  ):
         super(DockerBridge, self).__init__()
         self.Name = name
         self.Driver = "bridge"
         self.Subnet = subnet
         self.IPRange = iprange
         self.Gateway = gateway
-        rospy.init_node('docker_bridge', anonymous=True, log_level=rospy.DEBUG)
+        rospy.init_node('docker_bridge', anonymous=True) #, log_level=rospy.DEBUG)
 
     def create(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
@@ -75,8 +75,8 @@ if __name__ == '__main__':
     try:
         myDockerBridge = DockerBridge(  name=   "br0"           ,
                                         subnet= "172.28.0.0/16" ,
-                                        iprange="172.28.6.0/24" ,
-                                        gateway="172.28.6.254"  )
+                                        iprange="172.28.5.0/24" ,
+                                        gateway="172.28.5.254"  )
         myDockerBridge.create()
         rospy.spin()
     except rospy.ROSInterruptException:

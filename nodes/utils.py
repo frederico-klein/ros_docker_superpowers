@@ -13,14 +13,14 @@ class DockerLogged(object):
         rospy.on_shutdown(self.__ultraclose)
 
     #def afps(self, owner, private_name, classatrname):
-    def afps(self, classatrname, private_name):
+    def afps(self, classatrname, private_name, default_attribute = ""):
 
         """
-        old signature attribute_from_param_setter(owner, private_name, classatrname)
+        old signature attribute_from_param_setter(owner, private_name, classatrname, default_attribute = getattr(self,  classatrname))
 
         """
-        ##very non pythonic. improve
-        default_attribute = getattr(self,  classatrname)
+        if default_attribute is "":
+            default_attribute = getattr(self,  classatrname)
         setattr(self, classatrname, rospy.get_param('~{}'.format(private_name), default = default_attribute))#
         updated_param = getattr(self,  classatrname)
         rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~{}'.format(private_name)), updated_param)
@@ -69,3 +69,10 @@ class DockerLogged(object):
                 proc.kill()
             except:
                 pass
+
+class DockerLoggedNamed(DockerLogged):
+    def updateHostName(self):
+        self.HostName = rospy.get_node_uri().split("/")[2].split(":")[0]
+        ##Should not be an afps parameter because I don't want it to be changed
+        rospy.logdebug("Hostname running this node: {}".format(self.HostName))
+        rospy.set_param("~HostName",self.HostName)

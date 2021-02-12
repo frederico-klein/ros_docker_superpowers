@@ -5,8 +5,12 @@ import time
 import rospy
 import rosnode
 import rosparam
+
+from utils import DockerLoggedNamed
 from rosdop.srv import addVolume, addVolumeResponse
 from rosdop.srv import RmVolume, RmVolumeResponse
+from rosdop.srv import addDockerMachine, addDockerMachineResponse
+from rosdop.srv import RmDockerMachine, RmDockerMachineResponse
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -28,12 +32,15 @@ class DockerMasterInterface():
         self.master = DockerMaster()
         self.master_handle = self.get_master()
         self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
+        self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
 
         if self.master_handle is not None:
             rospy.wait_for_service('{}/add_volume'.format(self.master_handle))
             try:
                 self.add_vol = rospy.ServiceProxy('{}/add_volume'.format(self.master_handle), addVolume)
                 self.rm_vol = rospy.ServiceProxy('{}/rm_volume'.format(self.master_handle), RmVolume)
+                self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
+                self.rm_host = rospy.ServiceProxy('{}/rm_host'.format(self.master_handle), RmDockerMachine)
 
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
@@ -59,6 +66,26 @@ class DockerMasterInterface():
 
         return self.master.TubVolumeDic[name]
 
+    def get_ws_host_by_name(self,name):
+
+        try:
+            ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
+            tries = 10
+            while tries >0:
+                ###It doesnt make sense not to update this. Idk what I was thinking
+                self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
+                if len(self.master.HostDic) != 0 and name in self.master.HostDic:
+                    break
+                else:
+                    tries -= 1
+                    rospy.logwarn("Volume List is empty or does not contain desired host. Have you initiated the host yet?")
+                    time.sleep(3)
+        except rospy.ROSException as e:
+            rospy.logerr("Unexpected! {}".format(e))
+
+        return self.master.HostDic[name]
+
+
     def get_master(self):
         tries = 10
         while (tries > 0):
@@ -69,7 +96,7 @@ class DockerMasterInterface():
             else:
                 tries -= 1
                 rospy.logwarn("Docker Master not found yet. Is it running? Will retry {} more times.".format(tries))
-                time.sleep(0.3)
+                time.sleep(3)
 
         if "docker_master" not in rosnode.get_node_names():
             rospy.logfatal("Didn't find master. ")
@@ -89,7 +116,17 @@ class DockerMasterInterface():
         self.rm_vol(VolumeName)
         self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
 
-class DockerMaster():
+    def addHost(self,TubName, HostName, IP):
+        rospy.loginfo("Service add host called.")
+        self.add_host(TubName, HostName, IP)
+        self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
+
+    def rmHost(self,TubName, HostName):
+        rospy.loginfo("Service rm host called.")
+        self.rm_host(TubName, HostName)
+        self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
+
+class DockerMaster(DockerLoggedNamed):
     """
     This is the node that control other docker resources.
     If you want to deal with multi-master, then you need to assign each resource
@@ -97,8 +134,17 @@ class DockerMaster():
     single master.
     """
     TubVolumeDic = {}
+    HostDic = {}
+    HostName = ""
+    UseDnsMasq = False
+
+    def __init__(self):
+        super(DockerMaster, self).__init__()
+
     def startup(self):
-        rospy.init_node('docker_master', anonymous=False)
+        rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
+        self.updateHostName()
+
         ### I will want to keep a list of volumes, nodes and bridges.
         #OR I can just get them from the docker tools which already do all of that?
         # then again I can maybe have a bunch of stuff running everywhere?
@@ -109,8 +155,11 @@ class DockerMaster():
         ##Right now I just want a list of Tubvolumes:
         #self.TubVolumeDic = {}
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
+        rospy.set_param("~HostDic",self.HostDic)
         self.addVolumeSrv = rospy.Service('~add_volume', addVolume, self.handle_add_volume)
         self.rmVolumeSrv = rospy.Service('~rm_volume', RmVolume, self.handle_rm_volume)
+        self.addHostSrv = rospy.Service('~add_host', addDockerMachine, self.handle_add_host)
+        self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
         #rospy.set_param("~TubVolumeDic",[])
         rospy.on_shutdown(self.close)
 
@@ -127,6 +176,25 @@ class DockerMaster():
         self.TubVolumeDic.pop(req.VolumeName)
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         return RmVolumeResponse()
+
+    def handle_add_host(self,req):
+        rospy.loginfo("Adding Ros Docker Host (tub) {}:{}, {} to list".format(req.TubName, req.HostName,  req.IP))
+        rospy.logdebug("Current host dictionary: before adding %s"%(self.HostDic))
+        ###there is maybe a clever way of doing this, but I am not having it.
+        if req.HostName in self.HostDic:
+            self.HostDic[req.HostName].update({req.TubName: req.IP})
+        else:
+            self.HostDic.update({req.HostName:{req.TubName: req.IP}})
+        #self.HostDic[req.HostName].update({req.TubName: req.IP})
+        rospy.logdebug("Current host dictionary: %s"%(self.HostDic))
+        rospy.set_param("~HostDic",self.HostDic)
+        return addDockerMachineResponse()
+
+    def handle_rm_host(self,req):
+        rospy.loginfo("Removing Ros Docker Host (tub) {} from {} list".format(req.TubName, req.HostName))
+        self.HostDic[req.HostName].pop(req.TubName)
+        rospy.set_param("~HostDic",self.HostDic)
+        return RmDockerMachineResponse()
 
     def close(self):
         rospy.loginfo("Shutting down. Waiting for other processes to close") ## this is a lie and it will fail if anything takes less than N seconds to close. I need to actually do this, hook them and then get the closure notice

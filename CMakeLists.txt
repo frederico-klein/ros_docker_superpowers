@@ -14,6 +14,16 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 )
 
+set( DOCKERMACHINENAME ros_dnsmasq)
+##this must have an alias, but I guess it is fine and shouldn't break
+set( DOCKERWORKINGDIR ../../src/rosdop/)
+#set( nocache OFF)
+set( DOCKERCONTEXT ./dnsmasq/)
+
+set( NOCACHE OFF)
+
+
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -59,6 +69,8 @@ find_package(catkin REQUIRED COMPONENTS
    FILES
    addVolume.srv
    RmVolume.srv
+   addDockerMachine.srv
+   RmDockerMachine.srv
 #   Service1.srv
 #   Service2.srv
  )
@@ -156,6 +168,38 @@ include_directories(
 ##this does not make a lot of sense to be added here. it needs to be added on a per_package basis.
 
 #add_custom_target()
+
+############
+if(NOCACHE)
+  message("No cache for ${PROJECT_NAME} docker building all layers!")
+
+  add_custom_target( docker_build_${PROJECT_NAME} ALL
+  COMMAND docker build --no-cache -t ${DOCKERMACHINENAME} -f dnsmasq/Dockerfile ${DOCKERCONTEXT}
+
+  #COMMAND ls -la
+
+  COMMENT Building docker image ${DOCKERMACHINENAME} without cache
+  WORKING_DIRECTORY  ${DOCKERWORKINGDIR}
+
+  ) ## here is the thing, do I want this to run every time?
+
+else()
+  message("Cache used for ${PROJECT_NAME} docker building.")
+  add_custom_target( docker_build_${PROJECT_NAME} ALL
+  COMMAND docker build -t ${DOCKERMACHINENAME} -f dnsmasq/Dockerfile ${DOCKERCONTEXT}
+
+  #COMMAND ls -la
+
+  COMMENT Building docker image ${DOCKERMACHINENAME}
+  WORKING_DIRECTORY  ${DOCKERWORKINGDIR}
+
+  ) ## here is the thing, do I want this to run every time?
+endif(NOCACHE)
+
+
+
+
+
 
 #############
 ## Install ##

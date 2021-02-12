@@ -1,0 +1,12 @@
+<launch>
+  <node name="my_dnsmasq" pkg="rosdop" type="cr_ros_dnsmasq.py" output="screen" required="true">
+    <param name="name"            type="string"       value="tub_dnsmasq"           />
+    <param name="imagename"       type="string"       value="ros_dnsmasq"        />
+    <param name="ros_dnsmasq_port"  type="int" value="53"                           />
+    <param name="network_name"    type="string"       value="br0"            />
+    <param name="container_hostname"        type="string"       value="rosdnsmasq1" />
+    <param name="dockerfile_directory" type="string"  value="."              />
+    <param name="containerip"            type="string"  value="172.28.5.53"    />
+    <param name="use_gpu"            type="bool"  value="False"    />
+  </node>
+</launch>

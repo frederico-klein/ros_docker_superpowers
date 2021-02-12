@@ -43,13 +43,13 @@ class TubVolume(DockerLogged):
     def __init__(self,
             name="sshvolume-workspace-torch_new899",
             username="frederico",
-            sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
+            sshfs_hostname="poop.local", ##the name of the machine that has the sshfs path we want to share
             identity_file="/root/.ssh/id_rsa",
             tub_path = "./", ##no idea how to set this correctly, probably only as a param
             ws_path = "/workspace"
             ):
         super(TubVolume, self).__init__()
-        rospy.init_node('docker_volume', anonymous=True, log_level=rospy.DEBUG)
+        rospy.init_node('docker_volume', anonymous=True)#, log_level=rospy.DEBUG)
         rospy.loginfo("Docker Volume spawner node started. ")
         self.Name = name
         self.Driver = "vieux/sshfs"
@@ -128,9 +128,9 @@ if __name__ == '__main__':
         myTubVolume = TubVolume(
                 name="tubvolume0",
                 username="frederico",
-                sshfs_hostname="192.168.0.6", ##the name of the machine that has the sshfs path we want to share
+                sshfs_hostname="poop.local", ##the name of the machine that has the sshfs path we want to share
                 identity_file="/root/.ssh/id_rsa",
-                tub_path = "/home/frederico/whole_lavine/catkin_docker/src/dop_tch", ##no idea how to set this correctly
+                tub_path = "/home/frederico/whole_poop/catkin_docker/src/dop_tch", ##no idea how to set this correctly
                 ws_path = "/workspace"
                 )
         myTubVolume.open()

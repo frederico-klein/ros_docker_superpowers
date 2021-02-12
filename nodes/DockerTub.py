@@ -6,10 +6,20 @@
 ## creates the bridge.
 
 import rospy
-from utils import DockerLogged
+from utils import DockerLoggedNamed
 from docker_master import DockerMasterInterface as DMI
 
-class Tub(DockerLogged):
+def flatten(nl):
+    listA = []
+    for item in nl:
+        if isinstance(item,list):
+            listA.extend(flatten(item))
+        else:
+            listA.append(item)
+    return listA
+
+
+class Tub(DockerLoggedNamed):
     """
     This can be invoked with something like:
     from DockerTub import Tub
@@ -26,20 +36,24 @@ class Tub(DockerLogged):
             imagename=              "tch_new"       ,
             network_name=           "br0"           ,
             tub_volume=             "tubvolume0"    ,
-            hostname=               "torch_machine4",
+            container_hostname=               "torch_machine4",
             dockerfile_directory=   "."             ,
-            machineip=              "172.28.6.31"   ):
+            containerip=              "172.28.5.31",
+            use_gpu=                "True"   ):
         super(Tub, self).__init__()
         self.Name = name
         self.NetworkName = network_name
         self.ImageName = imagename
         self.TubVolume = tub_volume
-        self.MachineHostname = hostname
+        self.TubName = container_hostname
         self.DockerfileDirectory = dockerfile_directory
-        self.IP = machineip
+        self.IP = containerip
+        self.UseGpu = use_gpu
 
-        self.DMI = DMI()
         rospy.init_node('docker_tub', anonymous=True, log_level=rospy.DEBUG)
+
+        self.updateHostName()
+        self.post_init()
 
     def updateBuild(self):
         ## this no longer works for some builds where I wanted nvidia to be present during the build to detect the graphics card and know what to do. I am not 100% sure it ever worked, so it is a maybe on the todo list
@@ -49,7 +63,7 @@ class Tub(DockerLogged):
             self.DockerfileDirectory
             ])
 
-    def create(self):
+    def post_init(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
         ## this is the best I could do with python 2.7 and my python fu
 
@@ -57,15 +71,21 @@ class Tub(DockerLogged):
         self.afps("ImageName"   ,"imagename"     )
         self.afps("NetworkName" ,"network_name"  )
         self.afps("TubVolume"   ,"tub_volume"    )
-        self.afps("MachineHostname"    ,"hostname")
+        self.afps("TubName"     ,"container_hostname")
+        self.afps("UseGpu"      ,"use_gpu")
 
+        self.DMI = DMI()
         ###here I need to get the TubVolume's properies.
         self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume)
         #self.Display = ":0"
 
         self.afps("DockerfileDirectory"  , "dockerfile_directory")
-        self.afps("IP"                   , "machineip"           )
+        self.afps("IP"                   , "containerip"           )
 
+        self.DMI.addHost(self.TubName, self.HostName, self.IP)
+        rospy.loginfo("Added host to DMI OK.")
+
+    def create(self):
         rospy.loginfo("Mounting docker image {}".format(self.Name))
 
         ##check if there is a volume already
@@ -77,7 +97,7 @@ class Tub(DockerLogged):
 
             ## I guess it cant be interactive this time. for interaction we will rely on sshd working
             rospy.loginfo("Docker container not found. Creating one. ")
-            proc_list = ['docker','run',"--gpus",'"device=0"',
+            proc_list = ['docker','run',self.get_use_gpu(),
                  #"--rm",
                  #"-it",
                  "--name", self.Name,
@@ -85,19 +105,35 @@ class Tub(DockerLogged):
                  "-u","root",
                  #"-e","DISPLAY=$DISPLAY",
                  #"-v","/tmp/.X11-unix:/tmp/.X11-unix",
-                 "-v","{}:{}".format(self.TubVolume,self.WsPath),
-                 "-v","/mnt/share:/mnt/share",
-                 "-h","{}".format(self.MachineHostname),
+                 self.get_own_volumes(),
+                 "-h","{}".format(self.TubName),
                  "--network={}".format(self.NetworkName),
                  "--ip={}".format(self.IP),
                  self.ImageName,
-                 "bash"
+                 self.get_entrypoint()
              ]
-            self.lspPopen(proc_list)
+            #print(flatten(proc_list))
+            self.lspPopen(flatten(proc_list))
         rospy.on_shutdown(self.close)
 
-    def close(self):
-        rospy.loginfo("Starting shutting down sequence for {}.".format(self.Name))
+    def get_use_gpu(self):
+        if self.UseGpu:
+            return ["--gpus",'"device=0"']
+        else:
+            return []
+
+    def get_own_volumes(self):
+        return   ["-v","{}:{}".format(self.TubVolume,self.WsPath),
+                 "-v","/mnt/share:/mnt/share"]
+
+    def get_entrypoint(self):
+        return ["bash"]
+
+    def close(self, silent = False, reset = False):
+        if not silent:
+            rospy.loginfo("Starting shutting down sequence for {}.".format(self.Name))
+        if not reset:
+            self.DMI.rmHost(self.TubName, self.HostName)
 
         output = self.oLspPopen(['docker','ps'])
 
@@ -106,6 +142,8 @@ class Tub(DockerLogged):
             ##docker stop kill or rm???
             self.lspPopenRetry(['docker','stop',self.Name])
             rospy.loginfo("Stop okay.")
+        elif silent:
+            pass
         else:
             rospy.logerr("Docker container {} already closed!! There are issues with the container initialization or persistence.".format(self.Name))
 
@@ -116,6 +154,8 @@ class Tub(DockerLogged):
             ##docker stop kill or rm???
             self.lspPopenRetry(['docker','rm',self.Name])
             rospy.loginfo("Delete okay. Bye!")
+        elif silent:
+            pass
         else:
             rospy.logerr("Unexpected. Docker container {} already deleted.".format(self.Name))
 

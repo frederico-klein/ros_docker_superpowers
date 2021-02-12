@@ -1,0 +1,5 @@
+<launch>
+  <node name="docker_master" pkg="rosdop" type="docker_master.py" output="screen">
+    <!-- <param name="use_dnsmasq"  type="bool" value="True"                           /> -->
+  </node>
+</launch>

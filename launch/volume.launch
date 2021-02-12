@@ -1,5 +1,0 @@
-<launch>
-  <node name="" pkg="rosdop" type="cr_volume.py" output="screen"/>
-  <node name="docker_master" pkg="rosdop" type="docker_master.py" output="screen"/>
-
-</launch>
