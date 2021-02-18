@@ -31,7 +31,7 @@ class DockerBridge(DockerLogged):
         self.Subnet = subnet
         self.IPRange = iprange
         self.Gateway = gateway
-        rospy.init_node('docker_bridge', anonymous=True) #, log_level=rospy.DEBUG)
+        rospy.init_node('docker_bridge', anonymous=True, log_level=rospy.DEBUG)
 
     def create(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
@@ -54,18 +54,20 @@ class DockerBridge(DockerLogged):
         output = self.lspPopen(['docker','network','ls'])[0]
 
         if self.Name in output: #if there isn't create one
-            rospy.loginfo("found {} docker network.".format(self.Name))
-        else:
-            # I am unsure about this.
-            list_args = [
-                "docker","network","create",
-                "--driver={}".format(self.Driver),
-                "--subnet={}".format(self.Subnet),
-                "--ip-range={}".format(self.IPRange),
-                "--gateway={}".format(self.Gateway),
-                self.Name]
-            self.lspPopen(list_args)
-            rospy.on_shutdown(self.close)
+            rospy.loginfo("found {} docker network. Removing and creating a new one.".format(self.Name))
+            self.lspPopenRetry(['docker','network','rm',self.Name])
+
+        # I am unsure about this.
+        list_args = [
+            "docker","network","create",
+            "--attachable",
+            "--driver={}".format(self.Driver),
+            "--subnet={}".format(self.Subnet),
+            "--ip-range={}".format(self.IPRange),
+            "--gateway={}".format(self.Gateway),
+            self.Name]
+        self.lspPopen(list_args)
+        rospy.on_shutdown(self.close)
 
     def close(self):
         rospy.loginfo("Shutting down. Deleting bridge {}".format(self.Name))

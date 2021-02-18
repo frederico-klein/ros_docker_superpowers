@@ -31,12 +31,12 @@ class DockerMasterInterface():
     def __init__(self):
         self.master = DockerMaster()
         self.master_handle = self.get_master()
-        self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
-        self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
 
         if self.master_handle is not None:
             rospy.wait_for_service('{}/add_volume'.format(self.master_handle))
             try:
+                self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
+                self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
                 self.add_vol = rospy.ServiceProxy('{}/add_volume'.format(self.master_handle), addVolume)
                 self.rm_vol = rospy.ServiceProxy('{}/rm_volume'.format(self.master_handle), RmVolume)
                 self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
@@ -44,6 +44,7 @@ class DockerMasterInterface():
 
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
+                raise Exception
 
         rospy.loginfo("DMI init OK. ")
 
@@ -54,7 +55,7 @@ class DockerMasterInterface():
             tries = 10
             while tries >0:
                 ###It doesnt make sense not to update this. Idk what I was thinking
-                self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
+                self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 if len(self.master.TubVolumeDic) != 0 and name in self.master.TubVolumeDic:
                     break
                 else:
@@ -73,12 +74,12 @@ class DockerMasterInterface():
             tries = 10
             while tries >0:
                 ###It doesnt make sense not to update this. Idk what I was thinking
-                self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
+                self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
                 if len(self.master.HostDic) != 0 and name in self.master.HostDic:
                     break
                 else:
                     tries -= 1
-                    rospy.logwarn("Volume List is empty or does not contain desired host. Have you initiated the host yet?")
+                    rospy.logwarn("Volume List is empty or does not contain desired host. Have you initiated a host yet?")
                     time.sleep(3)
         except rospy.ROSException as e:
             rospy.logerr("Unexpected! {}".format(e))
@@ -91,8 +92,15 @@ class DockerMasterInterface():
         while (tries > 0):
             for node in rosnode.get_node_names():
                 if "docker_master" in node:
-                    rospy.loginfo("Found master")
-                    return node
+                    rospy.loginfo("Found master. Waiting for it to finish loading...")
+                    try:
+                        if rosparam.get_param("{}/Ready".format(node)):
+                            rospy.loginfo("Master alive, continuing.")
+                            return node
+                    except:
+                        tries -= 1
+                        rospy.logwarn("Docker Master did not finish initializing. Will retry {} more times.".format(tries))
+                        time.sleep(3)
             else:
                 tries -= 1
                 rospy.logwarn("Docker Master not found yet. Is it running? Will retry {} more times.".format(tries))
@@ -109,22 +117,22 @@ class DockerMasterInterface():
     def addVolume(self,VolumeName, WsPath):
         rospy.loginfo("Service add volume called.")
         self.add_vol(VolumeName, WsPath)
-        self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
+        self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
 
     def rmVolume(self,VolumeName):
         rospy.loginfo("Service rm volume called.")
         self.rm_vol(VolumeName)
-        self.master.TubVolumeDic = rosparam.get_param("//docker_master/TubVolumeDic")
+        self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
 
     def addHost(self,TubName, HostName, IP):
         rospy.loginfo("Service add host called.")
         self.add_host(TubName, HostName, IP)
-        self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
+        self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
     def rmHost(self,TubName, HostName):
         rospy.loginfo("Service rm host called.")
         self.rm_host(TubName, HostName)
-        self.master.HostDic = rosparam.get_param("//docker_master/HostDic")
+        self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
 class DockerMaster(DockerLoggedNamed):
     """
@@ -162,6 +170,7 @@ class DockerMaster(DockerLoggedNamed):
         self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
         #rospy.set_param("~TubVolumeDic",[])
         rospy.on_shutdown(self.close)
+        rospy.set_param("~Ready", True)
 
     def handle_add_volume(self,req):
         rospy.loginfo("Adding Volume {}:{} to list".format(req.VolumeName,  req.WsPath))
