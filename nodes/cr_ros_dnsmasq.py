@@ -18,6 +18,7 @@ class DnsMasqTub(Tub):
             os.makedirs(self.ros_msq_dir)
         rospy.logdebug("Using auxiliary dnsmasq in {}".format(self.ros_msq_dir))
         self.update_host_list()
+        self.DMI.register_dnsmasq(self.IP)
 
     def get_own_volumes(self):
         return   ["-v", "{}:/etc/dnsmasq.conf".format(self.dnsmasqfile)]
@@ -31,10 +32,15 @@ class DnsMasqTub(Tub):
 
     def generate_dnsmasqconf(self):
         self.dnsmasqfile = self.ros_msq_dir + "/dnsmasq.conf"
+        rospy.logdebug("generating file {}".format(self.dnsmasqfile))
         shutil.copyfile(self.rospack.get_path('rosdop') + "/dnsmasq/ros-tmp-hosts", dst=self.dnsmasqfile)
         #address=/torch_machine4.poop/172.28.5.31
         with open(self.dnsmasqfile, "a") as myfile:
-            myfile.write("address=/torch_machine4.poop/172.28.5.31")
+            add_expression = "address=/torch_machine4.poop/172.28.5.31"
+            rospy.logdebug("added:\n\t{}".format(add_expression))
+            myfile.write(add_expression)
+            # myfile.write("address=/torch_machine4.poop/172.28.5.31")
+
 
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it

@@ -7,10 +7,25 @@ import rosnode
 import rosparam
 
 from utils import DockerLoggedNamed
+from std_srvs.srv import Empty
 from rosdop.srv import addVolume, addVolumeResponse
 from rosdop.srv import RmVolume, RmVolumeResponse
 from rosdop.srv import addDockerMachine, addDockerMachineResponse
 from rosdop.srv import RmDockerMachine, RmDockerMachineResponse
+
+import socket
+# import dns.resolver
+#
+# # Basic query
+# for rdata in dns.resolver.query('www.yahoo.com'):
+#     print rdata.target
+#
+# # Set the DNS Server
+# resolver = dns.resolver.Resolver()
+# resolver.nameservers=[socket.gethostbyname('ns1.cisco.com')]
+# for rdata in resolver.query('www.yahoo.com') :
+#     print rdata.target
+
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -31,9 +46,13 @@ class DockerMasterInterface():
     def __init__(self):
         self.master = DockerMaster()
         self.master_handle = self.get_master()
+        self.dnsmasqIP = None
+        self.resolver = dns.resolver.Resolver()
+        # TODO: make parameter?
+        self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
 
         if self.master_handle is not None:
-            rospy.wait_for_service('{}/add_volume'.format(self.master_handle))
+            rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
             try:
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
@@ -41,12 +60,17 @@ class DockerMasterInterface():
                 self.rm_vol = rospy.ServiceProxy('{}/rm_volume'.format(self.master_handle), RmVolume)
                 self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
                 self.rm_host = rospy.ServiceProxy('{}/rm_host'.format(self.master_handle), RmDockerMachine)
+                self.update_hosts = rospy.ServiceProxy('{}/upd_host'.format(self.master_handle), Empty)
 
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
                 raise Exception
 
         rospy.loginfo("DMI init OK. ")
+
+    def register_dnsmasq(self, IP):
+        self.dnsmasqIP = IP
+        rospy.loginfo("Registered dnsmasq server at {}".format(IP))
 
     def get_ws_volume_by_name(self,name):
 
@@ -145,6 +169,7 @@ class DockerMaster(DockerLoggedNamed):
     HostDic = {}
     HostName = ""
     UseDnsMasq = False
+    DockerHosts = {}
 
     def __init__(self):
         super(DockerMaster, self).__init__()
@@ -168,9 +193,18 @@ class DockerMaster(DockerLoggedNamed):
         self.rmVolumeSrv = rospy.Service('~rm_volume', RmVolume, self.handle_rm_volume)
         self.addHostSrv = rospy.Service('~add_host', addDockerMachine, self.handle_add_host)
         self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
+        self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
         #rospy.set_param("~TubVolumeDic",[])
         rospy.on_shutdown(self.close)
         rospy.set_param("~Ready", True)
+
+    def handle_update_host(self,req):
+        HostList = {}
+        for hostName, tubIpDic in self.HostDic.iteritems():
+            HostList[hostName] = socket.gethostbyname(hostName)
+        self.DockerHosts = HostList
+        rospy.loginfo("Current known list of hosts: {}".format())
+        return []
 
     def handle_add_volume(self,req):
         rospy.loginfo("Adding Volume {}:{} to list".format(req.VolumeName,  req.WsPath))
