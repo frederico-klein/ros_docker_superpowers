@@ -14,7 +14,7 @@ from rosdop.srv import addDockerMachine, addDockerMachineResponse
 from rosdop.srv import RmDockerMachine, RmDockerMachineResponse
 
 import socket
-# import dns.resolver
+import dns.resolver
 #
 # # Basic query
 # for rdata in dns.resolver.query('www.yahoo.com'):
@@ -41,6 +41,7 @@ class NoMaster(Error):
 
     def __init__(self):
         self.message = "No Master"
+        rospy.signal_shutdown(self.message)
 
 class DockerMasterInterface():
     def __init__(self):
