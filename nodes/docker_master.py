@@ -26,6 +26,7 @@ import dns.resolver
 # for rdata in resolver.query('www.yahoo.com') :
 #     print rdata.target
 
+###TODO: maybe use bond?
 
 class Error(Exception):
     """Base class for exceptions in this module."""
@@ -48,9 +49,6 @@ class DockerMasterInterface():
         self.master = DockerMaster()
         self.master_handle = self.get_master()
         self.dnsmasqIP = None
-        self.resolver = dns.resolver.Resolver()
-        # TODO: make parameter?
-        self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
 
         if self.master_handle is not None:
             rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
@@ -62,6 +60,7 @@ class DockerMasterInterface():
                 self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
                 self.rm_host = rospy.ServiceProxy('{}/rm_host'.format(self.master_handle), RmDockerMachine)
                 self.update_hosts = rospy.ServiceProxy('{}/upd_host'.format(self.master_handle), Empty)
+                self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
 
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
@@ -159,6 +158,10 @@ class DockerMasterInterface():
         self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
+    def __del__(self):
+        self.signal_death()
+        rospy.signal_shutdown("I am dying. Bye!")
+
 class DockerMaster(DockerLoggedNamed):
     """
     This is the node that control other docker resources.
@@ -195,8 +198,15 @@ class DockerMaster(DockerLoggedNamed):
         self.addHostSrv = rospy.Service('~add_host', addDockerMachine, self.handle_add_host)
         self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
+        self.DieSrv = rospy.Service('~die', Empty, self.die) ##this is simplistic it should be a list and then call everyone on the list to signal that I died.
+
         #rospy.set_param("~TubVolumeDic",[])
         rospy.on_shutdown(self.close)
+
+        self.resolver = dns.resolver.Resolver()
+        # TODO: make parameter?
+        self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
+
         rospy.set_param("~Ready", True)
 
     def handle_update_host(self,req):
@@ -239,6 +249,10 @@ class DockerMaster(DockerLoggedNamed):
         self.HostDic[req.HostName].pop(req.TubName)
         rospy.set_param("~HostDic",self.HostDic)
         return RmDockerMachineResponse()
+
+    def die(self,req):
+        rospy.signal_shutdown("Bye.")
+        return []
 
     def close(self):
         rospy.loginfo("Shutting down. Waiting for other processes to close") ## this is a lie and it will fail if anything takes less than N seconds to close. I need to actually do this, hook them and then get the closure notice
