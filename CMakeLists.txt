@@ -71,6 +71,7 @@ set( NOCACHE OFF)
    RmVolume.srv
    addDockerMachine.srv
    RmDockerMachine.srv
+   GenericString.srv
 #   Service1.srv
 #   Service2.srv
  )

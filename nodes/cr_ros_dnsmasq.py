@@ -5,11 +5,13 @@ import rospy
 import os, shutil
 import rospkg
 from DockerTub import Tub
+from std_srvs.srv import Empty
 
 class DnsMasqTub(Tub):
     def __init__(self):
         super(DnsMasqTub, self).__init__()
         self.rospack = rospkg.RosPack()
+        self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
 
         self.afps("RosDnsMasqPort","ros_dnsmasq_port", default_attribute=10053)
 
@@ -20,6 +22,11 @@ class DnsMasqTub(Tub):
         self.update_host_list()
         self.DMI.register_dnsmasq(self.IP)
 
+    def handle_update_host(self,req):
+        rospy.logwarn("upd_host service called")
+        self.update_host_list()
+        return []
+
     def get_own_volumes(self):
         return   ["-v", "{}:/etc/dnsmasq.conf".format(self.dnsmasqfile)]
 
@@ -27,6 +34,7 @@ class DnsMasqTub(Tub):
         return []
 
     def update_host_list(self):
+        self.DMI.update_hosts()
         self.generate_dnsmasqconf()
         self.restart_dnsmasq_docker()
 

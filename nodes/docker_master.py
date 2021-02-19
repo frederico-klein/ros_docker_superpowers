@@ -7,11 +7,12 @@ import rosnode
 import rosparam
 
 from utils import DockerLoggedNamed
-from std_srvs.srv import Empty
+from std_srvs.srv import Empty, EmptyResponse
 from rosdop.srv import addVolume, addVolumeResponse
 from rosdop.srv import RmVolume, RmVolumeResponse
 from rosdop.srv import addDockerMachine, addDockerMachineResponse
 from rosdop.srv import RmDockerMachine, RmDockerMachineResponse
+from rosdop.srv import GenericString, GenericStringResponse
 
 import socket
 import dns.resolver
@@ -61,6 +62,13 @@ class DockerMasterInterface():
                 self.rm_host = rospy.ServiceProxy('{}/rm_host'.format(self.master_handle), RmDockerMachine)
                 self.update_hosts = rospy.ServiceProxy('{}/upd_host'.format(self.master_handle), Empty)
                 self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
+
+                self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
+
+                self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), GenericString)
+                self.register_dmi(rospy.get_name())
+
+                rospy.on_shutdown(self.close)
 
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
@@ -158,8 +166,18 @@ class DockerMasterInterface():
         self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
-    def __del__(self):
-        self.signal_death()
+    def close_handle(self,req):
+        try:
+            self.close()
+        except:
+            pass
+        return EmptyResponse()
+
+    def close(self):
+        try:
+            self.signal_death()
+        except:
+            pass
         rospy.signal_shutdown("I am dying. Bye!")
 
 class DockerMaster(DockerLoggedNamed):
@@ -177,6 +195,8 @@ class DockerMaster(DockerLoggedNamed):
 
     def __init__(self):
         super(DockerMaster, self).__init__()
+        self.DnsMasqNodeName = ""
+        self.UseDnsMasq = False
 
     def startup(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
@@ -191,6 +211,8 @@ class DockerMaster(DockerLoggedNamed):
 
         ##Right now I just want a list of Tubvolumes:
         #self.TubVolumeDic = {}
+        self.signal_kill_dmis = []
+
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         rospy.set_param("~HostDic",self.HostDic)
         self.addVolumeSrv = rospy.Service('~add_volume', addVolume, self.handle_add_volume)
@@ -199,23 +221,54 @@ class DockerMaster(DockerLoggedNamed):
         self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
         self.DieSrv = rospy.Service('~die', Empty, self.die) ##this is simplistic it should be a list and then call everyone on the list to signal that I died.
+        self.registerDMI = rospy.Service('~register_dmi', Empty, self.handle_register_dmi)
+
+        self.afps("UseDnsMasq","use_dnsmasq")
+        self.afps("DnsMasqNodeName","dnsmasq_node_name")
+
+
 
         #rospy.set_param("~TubVolumeDic",[])
         rospy.on_shutdown(self.close)
+        rospy.set_param("~Ready", True)
+
+        if self.UseDnsMasq:
+            self.setup_dnsmasq()
 
         self.resolver = dns.resolver.Resolver()
         # TODO: make parameter?
         self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
 
-        rospy.set_param("~Ready", True)
+
+
+    def setup_dnsmasq(self):
+        rospy.logwarn("dnsmasq set!")
+        if not self.DnsMasqNodeName:
+            rospy.logfatal("Using dnsmaq but param dnsmasq_node_name is not set! Which dnsmasq should I use?")
+            raise Error
+
+        dnsmasq_update_service_string_handle = '{}/upd_host'.format(self.DnsMasqNodeName)
+        rospy.wait_for_service(dnsmasq_update_service_string_handle)
+        self.update_hosts = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
+        rospy.logwarn("dnsmasq finished setting up")
+
+
+    def handle_register_dmi(self,req):
+        signal_kill_dmis_string_handle = '{}/perish'.format(req.MyString)
+        self.signal_kill_dmis.append( rospy.ServiceProxy(signal_kill_dmis_string_handle, Empty))
+        return GenericStringResponse()
 
     def handle_update_host(self,req):
+        rospy.logwarn("update hosts called")
+        self.update_hosts()
+        return EmptyResponse()
+
+    def update_hosts(self):
         HostList = {}
         for hostName, tubIpDic in self.HostDic.iteritems():
             HostList[hostName] = socket.gethostbyname(hostName)
         self.DockerHosts = HostList
-        rospy.loginfo("Current known list of hosts: {}".format())
-        return []
+        rospy.loginfo("Current known list of hosts: {}".format(self.DockerHosts))
 
     def handle_add_volume(self,req):
         rospy.loginfo("Adding Volume {}:{} to list".format(req.VolumeName,  req.WsPath))
@@ -242,19 +295,23 @@ class DockerMaster(DockerLoggedNamed):
         #self.HostDic[req.HostName].update({req.TubName: req.IP})
         rospy.logdebug("Current host dictionary: %s"%(self.HostDic))
         rospy.set_param("~HostDic",self.HostDic)
+        self.update_hosts()
         return addDockerMachineResponse()
 
     def handle_rm_host(self,req):
         rospy.loginfo("Removing Ros Docker Host (tub) {} from {} list".format(req.TubName, req.HostName))
         self.HostDic[req.HostName].pop(req.TubName)
         rospy.set_param("~HostDic",self.HostDic)
+        self.update_hosts()
         return RmDockerMachineResponse()
 
     def die(self,req):
         rospy.signal_shutdown("Bye.")
-        return []
+        return EmptyResponse()
 
     def close(self):
+        for dieSrv in self.signal_kill_dmis:
+            dieSrv()
         rospy.loginfo("Shutting down. Waiting for other processes to close") ## this is a lie and it will fail if anything takes less than N seconds to close. I need to actually do this, hook them and then get the closure notice
         time.sleep(3)
 
