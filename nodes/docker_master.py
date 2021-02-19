@@ -50,6 +50,7 @@ class DockerMasterInterface():
         self.master = DockerMaster()
         self.master_handle = self.get_master()
         self.dnsmasqIP = None
+        self.node_name = rospy.get_name()
 
         if self.master_handle is not None:
             rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
@@ -63,10 +64,10 @@ class DockerMasterInterface():
                 self.update_hosts = rospy.ServiceProxy('{}/upd_host'.format(self.master_handle), Empty)
                 self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
 
-                self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
+                #self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
 
                 self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), GenericString)
-                self.register_dmi(rospy.get_name())
+                self.register_dmi(self.node_name)
 
                 rospy.on_shutdown(self.close)
 
@@ -166,15 +167,26 @@ class DockerMasterInterface():
         self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
-    def close_handle(self,req):
-        try:
-            self.close()
-        except:
-            pass
-        return EmptyResponse()
+    # def close_handle(self,req):
+    #     try:
+    #         self.close()
+    #     except:
+    #         pass
+    #     return EmptyResponse()
 
     def close(self):
         try:
+            ##first close everyone but self
+            ###compile list of DMIs to kill:
+            dmi_list = rosparam.get_param("{}/allDMIs".format(self.master_handle))
+            ##do a set difference to get everone but self:
+            dmis_to_kill = set(dmi_list)-set(self.node_name)
+            dmi_srv_prox_list = []
+            for dmi_handle in dmis_to_kill:
+                dmi_srv_prox_list.append(rospy.ServiceProxy(dmi_handle),Empty)
+            for dieSrv in dmi_srv_prox_list:
+                dieSrv()
+            ##then close master.
             self.signal_death()
         except:
             pass
@@ -221,12 +233,10 @@ class DockerMaster(DockerLoggedNamed):
         self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
         self.DieSrv = rospy.Service('~die', Empty, self.die) ##this is simplistic it should be a list and then call everyone on the list to signal that I died.
-        self.registerDMI = rospy.Service('~register_dmi', Empty, self.handle_register_dmi)
+        self.registerDMI = rospy.Service('~register_dmi', GenericString, self.handle_register_dmi)
 
         self.afps("UseDnsMasq","use_dnsmasq")
         self.afps("DnsMasqNodeName","dnsmasq_node_name")
-
-
 
         #rospy.set_param("~TubVolumeDic",[])
         rospy.on_shutdown(self.close)
@@ -239,8 +249,6 @@ class DockerMaster(DockerLoggedNamed):
         # TODO: make parameter?
         self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
 
-
-
     def setup_dnsmasq(self):
         rospy.logwarn("dnsmasq set!")
         if not self.DnsMasqNodeName:
@@ -252,10 +260,12 @@ class DockerMaster(DockerLoggedNamed):
         self.update_hosts = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
         rospy.logwarn("dnsmasq finished setting up")
 
-
     def handle_register_dmi(self,req):
         signal_kill_dmis_string_handle = '{}/perish'.format(req.MyString)
-        self.signal_kill_dmis.append( rospy.ServiceProxy(signal_kill_dmis_string_handle, Empty))
+        self.signal_kill_dmis.append( signal_kill_dmis_string_handle)
+        # self.signal_kill_dmis.append( rospy.ServiceProxy(signal_kill_dmis_string_handle, Empty))
+        rospy.logdebug("current list of linked DMIs: {}".format(self.signal_kill_dmis))
+        rospy.set_param("~allDMIs",self.signal_kill_dmis)
         return GenericStringResponse()
 
     def handle_update_host(self,req):
