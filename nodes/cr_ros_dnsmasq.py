@@ -34,7 +34,7 @@ class DnsMasqTub(Tub):
         return []
 
     def update_host_list(self):
-        self.DMI.update_hosts()
+        #self.DMI.update_hosts()
         self.generate_dnsmasqconf()
         self.restart_dnsmasq_docker()
 

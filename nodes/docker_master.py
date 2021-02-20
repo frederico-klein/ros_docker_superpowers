@@ -48,7 +48,7 @@ class NoMaster(Error):
 class DockerMasterInterface():
     def __init__(self, level, dns_check = True):
         self.master = DockerMaster()
-        self.rate = rospy.Rate(3)
+        self.rate = rospy.Rate(1)
         self.master_handle = self.get_master()
         self.dnsmasqIP = None
         self.node_name = rospy.get_name()
@@ -57,6 +57,9 @@ class DockerMasterInterface():
         if self.master_handle is not None:
             rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
             try:
+                while not rosparam.get_param("{}/Ready".format(self.master_handle)):
+                    rospy.logdebug("Waiting for master ready flag to be set to true.")
+                    self.rate.sleep()
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
                 self.add_vol = rospy.ServiceProxy('{}/add_volume'.format(self.master_handle), addVolume)
@@ -85,7 +88,7 @@ class DockerMasterInterface():
                 raise Exception
         if dns_check:
             while(not rosparam.get_param("{}/dnsmasqIP".format(self.master_handle))):
-                rospy.loginfo("Waiting for dns to be present.")
+                rospy.loginfo_once("Waiting for dns to be present.")
                 self.rate.sleep()
             self.dnsmasqIP = rosparam.get_param("{}/dnsmasqIP".format(self.master_handle))
 
@@ -139,7 +142,7 @@ class DockerMasterInterface():
         while (tries > 0):
             for node in rosnode.get_node_names():
                 if "docker_master" in node:
-                    rospy.loginfo("Found master. Waiting for it to finish loading...")
+                    rospy.loginfo("Found master in {}. Waiting for it to finish loading...".format(node))
                     try:
                         if rosparam.get_param("{}/Ready".format(node)):
                             rospy.loginfo("Master alive, continuing.")
@@ -209,7 +212,12 @@ class DockerMasterInterface():
     #             rospy.logwarn("could not kill {}".format(dmi_handle))
     #     ##then close master.
     #     rospy.logwarn("Sending signal for master to die.")
-         self.signal_death()
+        try:
+            self.signal_death()
+        except:
+            #when does this fail? if master is already closed. it shouldn't happen, but I suppose we should catch it.
+            rospy.logerr("Master already dead! This shouldn't happen")
+
     #
     #     rospy.signal_shutdown("Ended Okay. Bye!")
 
@@ -233,9 +241,11 @@ class DockerMaster(DockerLoggedNamed):
         self.keep_alive = True
         self.dnsmasqIP = ""
         self.resolver = dns.resolver.Resolver()
+        self.dns_ready = False
 
     def __enter__(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
+        rospy.set_param("~Ready", False)
         self.updateHostName()
 
         ### I will want to keep a list of volumes, nodes and bridges.
@@ -268,7 +278,8 @@ class DockerMaster(DockerLoggedNamed):
 
         #rospy.set_param("~TubVolumeDic",[])
         #rospy.on_shutdown(self.close)
-        rospy.set_param("~Ready", True)
+
+        rospy.set_param("~Ready", True) ### this needs toi be before the setup_dnsmasq or it will enter in a deadlock
 
         if self.UseDnsMasq:
             self.setup_dnsmasq()
@@ -288,6 +299,7 @@ class DockerMaster(DockerLoggedNamed):
         rospy.loginfo("Waiting for {} to be alive.".format(dnsmasq_update_service_string_handle))
         rospy.wait_for_service(dnsmasq_update_service_string_handle)
         self.update_hosts_DNS = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
+        self.dns_ready = True
         rospy.logwarn("dnsmasq finished setting up")
 
     # def handle_register_dmi(self,req):
@@ -323,6 +335,8 @@ class DockerMaster(DockerLoggedNamed):
             #this fails often
             #HostList[hostName] = socket.gethostbyname(hostName)
         self.DockerHosts = HostList
+        if self.UseDnsMasq and self.dns_ready:
+            self.update_hosts_DNS()
         rospy.loginfo("Current known list of hosts: {}".format(self.DockerHosts))
 
     def handle_add_volume(self,req):
