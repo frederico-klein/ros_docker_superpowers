@@ -124,7 +124,7 @@ class Tub(DockerLoggedNamed):
                  self.get_entrypoint()
              ]
             #print(self.FullName())
-            #print(flatten(proc_list))
+            print(flatten(proc_list))
             self.lspPopen(flatten(proc_list))
         rospy.on_shutdown(self.close)
 
@@ -158,22 +158,22 @@ class Tub(DockerLoggedNamed):
 
         output = self.oLspPopen(['docker','ps'])
 
-        if self.FullName() in output: #if there isn't create one
-            rospy.loginfo("Found {} docker container found to be running. Now stopping... ".format(self.FullName()))
+        if self.Name in output: #if there isn't create one
+            rospy.loginfo("Found {} docker container found to be running, locally run as {}. Now stopping... ".format(self.FullName(), self.Name))
             ##docker stop kill or rm???
-            self.lspPopenRetry(['docker','stop',self.FullName()])
+            self.lspPopenRetry(['docker','stop',self.Name])
             rospy.loginfo("Stop okay.")
         elif silent:
             pass
         else:
-            rospy.logerr("Docker container {} already closed!! There are issues with the container initialization or persistence.".format(self.FullName()))
+            rospy.logerr("Docker container {}({}) already closed!! There are issues with the container initialization or persistence.".format(self.FullName(), self.Name))
 
         output = self.oLspPopen(['docker','container','ls','-a'])
 
-        if self.FullName() in output: #if there isn't create one
+        if self.Name in output: #if there isn't create one
             rospy.loginfo("Found {} docker container found. Now deleting... ".format(self.FullName()))
             ##docker stop kill or rm???
-            self.lspPopenRetry(['docker','rm',self.FullName()])
+            self.lspPopenRetry(['docker','rm',self.Name])
             rospy.loginfo("Delete okay. Bye!")
         elif silent:
             pass

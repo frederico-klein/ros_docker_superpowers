@@ -60,6 +60,11 @@ class DockerMasterInterface():
                 while not rosparam.get_param("{}/Ready".format(self.master_handle)):
                     rospy.logdebug("Waiting for master ready flag to be set to true.")
                     self.rate.sleep()
+                ###all parameters
+                all_pars = rosparam.get_param(self.master_handle)
+                for par,value in all_pars.iteritems():
+                    setattr(self.master, par, value)
+                self.master.UseDnsMasq = rosparam.get_param("{}/UseDnsMasq".format(self.master_handle))
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
                 self.add_vol = rospy.ServiceProxy('{}/add_volume'.format(self.master_handle), addVolume)
@@ -264,6 +269,12 @@ class DockerMaster(DockerLoggedNamed):
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         rospy.set_param("~dnsmasqIP",self.dnsmasqIP)
         rospy.set_param("~HostDic",self.HostDic)
+        ##this is dirty! I dont understand why I did it like this anymore. this needs cleaning
+        self.afps("UseDnsMasq","use_dnsmasq")
+        rospy.set_param("~UseDnsMasq",self.UseDnsMasq)
+
+        self.afps("DnsMasqNodeName","dnsmasq_node_name")
+
         self.addVolumeSrv = rospy.Service('~add_volume', addVolume, self.handle_add_volume)
         self.rmVolumeSrv = rospy.Service('~rm_volume', RmVolume, self.handle_rm_volume)
         self.addHostSrv = rospy.Service('~add_host', addDockerMachine, self.handle_add_host)
@@ -273,8 +284,7 @@ class DockerMaster(DockerLoggedNamed):
         # self.registerDMI = rospy.Service('~register_dmi', GenericString, self.handle_register_dmi)
         self.registerDMI = rospy.Service('~register_dmi', DMILevel, self.handle_register_dmi)
 
-        self.afps("UseDnsMasq","use_dnsmasq")
-        self.afps("DnsMasqNodeName","dnsmasq_node_name")
+
 
         #rospy.set_param("~TubVolumeDic",[])
         #rospy.on_shutdown(self.close)
