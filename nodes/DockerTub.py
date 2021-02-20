@@ -80,11 +80,7 @@ class Tub(DockerLoggedNamed):
 
         self.DMI = DMI(2, dns_check = self.DnsCheck)
         ###here I need to get the TubVolume's properies.
-        try:
-            ##the way I am using this, volumes are all local
-            self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume+"."+self.ownHostName, tries = 1)
-        except:
-            rospy.loginfo("Could not get tubvolume path. Will not mount or fail.")
+
         #self.Display = ":0"
 
         self.afps("DockerfileDirectory"  , "dockerfile_directory")
@@ -95,7 +91,7 @@ class Tub(DockerLoggedNamed):
         self.DMI.addHost(self.TubName, self.ownHostName, self.IP)
         rospy.loginfo("Added host to DMI OK.")
 
-    def create(self):
+    def create(self, recreate = False):
         rospy.loginfo("Mounting docker image {}".format(self.Name))
 
         ##check if there is a volume already
@@ -126,7 +122,8 @@ class Tub(DockerLoggedNamed):
             #print(self.FullName())
             print(flatten(proc_list))
             self.lspPopen(flatten(proc_list))
-        rospy.on_shutdown(self.close)
+        if not recreate:
+            rospy.on_shutdown(self.close)
 
     def get_dns(self):
         if self.DMI.master.UseDnsMasq:
@@ -141,6 +138,12 @@ class Tub(DockerLoggedNamed):
             return []
 
     def get_own_volumes(self):
+        try:
+            fullTubName = self.TubVolume+"."+self.ownHostName
+            ##the way I am using this, volumes are all local
+            self.WsPath = self.DMI.get_ws_volume_by_name(fullTubName, tries = 10)
+        except:
+            rospy.logerr("Could not get tubvolume path {}. Will not mount or fail.".format(fullTubName))
         return   ["-v","{}:{}".format(self.TubVolume,self.WsPath),
                  "-v","/mnt/share:/mnt/share"]
 

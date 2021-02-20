@@ -46,6 +46,15 @@ class NoMaster(Error):
         rospy.signal_shutdown(self.message)
 
 class DockerMasterInterface():
+    def update_from_master(self):
+        ###all parameters
+        all_pars = rosparam.get_param(self.master_handle)
+        rospy.logdebug("all parameters: {}".format(all_pars))
+        for par,value in all_pars.iteritems():
+            rospy.logdebug("{},{}".format(par,value))
+            setattr(self.master, par, value)
+        rospy.logdebug(dir(self.master))
+
     def __init__(self, level, dns_check = True):
         self.master = DockerMaster()
         self.rate = rospy.Rate(1)
@@ -60,10 +69,8 @@ class DockerMasterInterface():
                 while not rosparam.get_param("{}/Ready".format(self.master_handle)):
                     rospy.logdebug("Waiting for master ready flag to be set to true.")
                     self.rate.sleep()
-                ###all parameters
-                all_pars = rosparam.get_param(self.master_handle)
-                for par,value in all_pars.iteritems():
-                    setattr(self.master, par, value)
+                self.update_from_master()
+
                 self.master.UseDnsMasq = rosparam.get_param("{}/UseDnsMasq".format(self.master_handle))
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
@@ -347,7 +354,7 @@ class DockerMaster(DockerLoggedNamed):
             #this fails often
             #HostList[hostName] = socket.gethostbyname(hostName)
         self.DockerHosts = HostList
-        rospy.set_param("docker_hosts", self.DockerHosts)
+        rospy.set_param("~docker_hosts", self.DockerHosts)
         if self.UseDnsMasq and self.dns_ready:
             self.update_hosts_DNS()
         rospy.loginfo("Current known list of hosts: {}".format(self.DockerHosts))

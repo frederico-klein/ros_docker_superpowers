@@ -7,7 +7,7 @@
 
 import rospy
 from utils import DockerLoggedNamed
-
+from docker_master import DockerMasterInterface as DMI
 
 class DockerBridge(DockerLoggedNamed):
     """
@@ -32,6 +32,7 @@ class DockerBridge(DockerLoggedNamed):
         self.IPRange = iprange
         self.Gateway = gateway
         rospy.init_node('docker_bridge', anonymous=True, log_level=rospy.DEBUG)
+
 
     def create(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
@@ -69,6 +70,7 @@ class DockerBridge(DockerLoggedNamed):
             self.Name]
         self.lspPopen(list_args)
         rospy.on_shutdown(self.close)
+        self.DMI = DMI(1)
 
     def close(self):
         rospy.loginfo("Shutting down. Deleting bridge {}".format(self.Name))

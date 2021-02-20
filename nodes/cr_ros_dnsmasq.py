@@ -4,6 +4,7 @@
 import rospy
 import os, shutil
 import rospkg
+import rosparam
 from DockerTub import Tub
 from std_srvs.srv import Empty
 
@@ -19,7 +20,7 @@ class DnsMasqTub(Tub):
         if not os.path.exists(self.ros_msq_dir):
             os.makedirs(self.ros_msq_dir)
         rospy.logdebug("Using auxiliary dnsmasq in {}".format(self.ros_msq_dir))
-        self.update_host_list()
+        self.update_host_list(initial = True)
         self.DMI.register_dnsmasq(self.IP)
 
     def handle_update_host(self,req):
@@ -33,30 +34,57 @@ class DnsMasqTub(Tub):
     def get_entrypoint(self):
         return []
 
-    def update_host_list(self):
+    def update_host_list(self, initial = False):
         #self.DMI.update_hosts()
-        self.generate_dnsmasqconf()
+        self.generate_dnsmasqconf(init = initial)
         self.restart_dnsmasq_docker()
 
-    def generate_dnsmasqconf(self):
+    def generate_dnsmasqconf(self, init = False):
         self.dnsmasqfile = self.ros_msq_dir + "/dnsmasq.conf"
         rospy.logdebug("generating file {}".format(self.dnsmasqfile))
         shutil.copyfile(self.rospack.get_path('rosdop') + "/dnsmasq/ros-tmp-hosts", dst=self.dnsmasqfile)
+
+        while not rosparam.get_param("{}/Ready".format(self.DMI.master_handle)):
+            rospy.logdebug("Waiting for master ready flag to be set to true.")
+            self.SMI.rate.sleep()
+        self.DMI.update_from_master()
+        host_list = []
+        if not init:
+            rospy.logwarn(self.DMI.master.docker_hosts)
+            rospy.logwarn(self.DMI.master.HostDic)
+            host_list.extend(generate_string_list_for_dnsmasqfile_from_docker_hosts(self.DMI.master.docker_hosts))
+            host_list.extend(generate_string_list_for_dnsmasqfile_from_HostDic(self.DMI.master.HostDic))
         #address=/torch_machine4.poop/172.28.5.31
         with open(self.dnsmasqfile, "a") as myfile:
-            add_expression = "address=/torch_machine4.poop/172.28.5.31"
-            rospy.logdebug("added:\n\t{}".format(add_expression))
-            myfile.write(add_expression)
-            # myfile.write("address=/torch_machine4.poop/172.28.5.31")
+            for add_expression in host_list:
+                #add_expression = "address=/torch_machine4.poop/172.28.5.31"
+                rospy.logdebug("added:\n\t{}".format(add_expression))
+                myfile.write("{}\n".format(add_expression))
+                # myfile.write("address=/torch_machine4.poop/172.28.5.31")
 
 
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it
         self.close(silent = True, reset = True)
-        self.create()
+        self.create(recreate = True)
 
     def get_dns(self): ##I am providing the dns here. we don't want a loop
         return []
+
+def generate_string_list_for_dnsmasqfile_from_docker_hosts(docker_hosts):
+    string_list = []
+    suffix_list = [".Home", ".local", ""]
+    for key, value in docker_hosts.iteritems():
+        for suffix in suffix_list:
+            string_list.append("address=/{}{}/{}".format(key,suffix,value))
+    return string_list
+
+def generate_string_list_for_dnsmasqfile_from_HostDic(HostDic):
+    string_list = []
+    for suffix, machinesDic in HostDic.iteritems():
+        for machine, ip in machinesDic.iteritems():
+            string_list.append("address=/{}.{}/{}".format(machine,suffix,ip))
+    return string_list
 
 if __name__ == '__main__':
     try:
