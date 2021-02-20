@@ -72,6 +72,7 @@ set( NOCACHE OFF)
    addDockerMachine.srv
    RmDockerMachine.srv
    GenericString.srv
+   DMILevel.srv
 #   Service1.srv
 #   Service2.srv
  )

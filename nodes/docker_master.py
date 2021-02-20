@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import time
 import rospy
 import rosnode
 import rosparam
@@ -12,7 +11,8 @@ from rosdop.srv import addVolume, addVolumeResponse
 from rosdop.srv import RmVolume, RmVolumeResponse
 from rosdop.srv import addDockerMachine, addDockerMachineResponse
 from rosdop.srv import RmDockerMachine, RmDockerMachineResponse
-from rosdop.srv import GenericString, GenericStringResponse
+#from rosdop.srv import GenericString, GenericStringResponse
+from rosdop.srv import DMILevel, DMILevelResponse
 
 import socket
 import dns.resolver
@@ -46,17 +46,20 @@ class NoMaster(Error):
         rospy.signal_shutdown(self.message)
 
 class DockerMasterInterface():
-    def __init__(self):
+    def __init__(self, level):
         self.master = DockerMaster()
+        self.rate = rospy.Rate(3)
         self.master_handle = self.get_master()
         self.dnsmasqIP = None
         self.node_name = rospy.get_name()
+        self.aliveLevel = level
 
         if self.master_handle is not None:
             rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
             try:
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
+                self.master.UseDnsMasq =  rosparam.get_param("{}/UseDnsMasq".format(self.master_handle))
                 self.add_vol = rospy.ServiceProxy('{}/add_volume'.format(self.master_handle), addVolume)
                 self.rm_vol = rospy.ServiceProxy('{}/rm_volume'.format(self.master_handle), RmVolume)
                 self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
@@ -64,10 +67,17 @@ class DockerMasterInterface():
                 self.update_hosts = rospy.ServiceProxy('{}/upd_host'.format(self.master_handle), Empty)
                 self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
 
-                #self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
+                self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
 
-                self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), GenericString)
-                self.register_dmi(self.node_name)
+                # self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), GenericString)
+                # self.register_dmi(self.node_name)
+
+                self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), DMILevel)
+                #mySrvCall = DMILevel()
+                #mySrvCall.Level = level
+                #mySrvCall.DMIName = self.node_name
+                #self.register_dmi(mySrvCall)
+                self.register_dmi( self.node_name, level)
 
                 rospy.on_shutdown(self.close)
 
@@ -94,7 +104,7 @@ class DockerMasterInterface():
                 else:
                     tries -= 1
                     rospy.logwarn("Volume List is empty or does not contain desired volume. Have you mounted a volume yet?")
-                    time.sleep(3)
+                    self.rate.sleep()
         except rospy.ROSException as e:
             rospy.logerr("Unexpected! {}".format(e))
 
@@ -113,7 +123,7 @@ class DockerMasterInterface():
                 else:
                     tries -= 1
                     rospy.logwarn("Volume List is empty or does not contain desired host. Have you initiated a host yet?")
-                    time.sleep(3)
+                    self.rate.sleep()
         except rospy.ROSException as e:
             rospy.logerr("Unexpected! {}".format(e))
 
@@ -133,11 +143,11 @@ class DockerMasterInterface():
                     except:
                         tries -= 1
                         rospy.logwarn("Docker Master did not finish initializing. Will retry {} more times.".format(tries))
-                        time.sleep(3)
+                        self.rate.sleep()
             else:
                 tries -= 1
                 rospy.logwarn("Docker Master not found yet. Is it running? Will retry {} more times.".format(tries))
-                time.sleep(3)
+                self.rate.sleep()
 
         if "docker_master" not in rosnode.get_node_names():
             rospy.logfatal("Didn't find master. ")
@@ -167,30 +177,37 @@ class DockerMasterInterface():
         self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
-    # def close_handle(self,req):
-    #     try:
-    #         self.close()
-    #     except:
-    #         pass
-    #     return EmptyResponse()
+    def close_handle(self,req):
+          try:
+    #          # self.close()
+    #          self.rate,sleep()
+    #          self.rate,sleep()
+    #          self.rate,sleep()
+    #          self.rate,sleep()
+              rospy.signal_shutdown("Indirectly closed.")
+          except:
+              pass
+          return EmptyResponse()
 
     def close(self):
-        try:
-            ##first close everyone but self
-            ###compile list of DMIs to kill:
-            dmi_list = rosparam.get_param("{}/allDMIs".format(self.master_handle))
-            ##do a set difference to get everone but self:
-            dmis_to_kill = set(dmi_list)-set(self.node_name)
-            dmi_srv_prox_list = []
-            for dmi_handle in dmis_to_kill:
-                dmi_srv_prox_list.append(rospy.ServiceProxy(dmi_handle),Empty)
-            for dieSrv in dmi_srv_prox_list:
-                dieSrv()
-            ##then close master.
-            self.signal_death()
-        except:
-            pass
-        rospy.signal_shutdown("I am dying. Bye!")
+    #
+    #     ##first close everyone but self
+    #     ###compile list of DMIs to kill:
+    #     rospy.logwarn("removing all other dmis:")
+    #     dmi_list = rosparam.get_param("{}/allDMIs".format(self.master_handle))
+    #     ##do a set difference to get everone but self:
+    #     dmis_to_kill = set(dmi_list)-set(self.node_name)
+    #     rospy.logwarn("list of dmis to remove:{}".format(dmis_to_kill))
+    #     for dmi_handle in dmis_to_kill:
+    #         try:
+    #             rospy.ServiceProxy(dmi_handle,Empty)()
+    #         except:
+    #             rospy.logwarn("could not kill {}".format(dmi_handle))
+    #     ##then close master.
+    #     rospy.logwarn("Sending signal for master to die.")
+         self.signal_death()
+    #
+    #     rospy.signal_shutdown("Ended Okay. Bye!")
 
 class DockerMaster(DockerLoggedNamed):
     """
@@ -209,8 +226,9 @@ class DockerMaster(DockerLoggedNamed):
         super(DockerMaster, self).__init__()
         self.DnsMasqNodeName = ""
         self.UseDnsMasq = False
+        self.keep_alive = True
 
-    def startup(self):
+    def __enter__(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
         self.updateHostName()
 
@@ -223,7 +241,9 @@ class DockerMaster(DockerLoggedNamed):
 
         ##Right now I just want a list of Tubvolumes:
         #self.TubVolumeDic = {}
-        self.signal_kill_dmis = []
+        self.signal_kill_dmis = {}
+
+        self.rate = rospy.Rate(1)
 
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         rospy.set_param("~HostDic",self.HostDic)
@@ -233,13 +253,14 @@ class DockerMaster(DockerLoggedNamed):
         self.rmHostSrv = rospy.Service('~rm_host', RmDockerMachine, self.handle_rm_host)
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
         self.DieSrv = rospy.Service('~die', Empty, self.die) ##this is simplistic it should be a list and then call everyone on the list to signal that I died.
-        self.registerDMI = rospy.Service('~register_dmi', GenericString, self.handle_register_dmi)
+        # self.registerDMI = rospy.Service('~register_dmi', GenericString, self.handle_register_dmi)
+        self.registerDMI = rospy.Service('~register_dmi', DMILevel, self.handle_register_dmi)
 
         self.afps("UseDnsMasq","use_dnsmasq")
         self.afps("DnsMasqNodeName","dnsmasq_node_name")
 
         #rospy.set_param("~TubVolumeDic",[])
-        rospy.on_shutdown(self.close)
+        #rospy.on_shutdown(self.close)
         rospy.set_param("~Ready", True)
 
         if self.UseDnsMasq:
@@ -255,18 +276,27 @@ class DockerMaster(DockerLoggedNamed):
             rospy.logfatal("Using dnsmaq but param dnsmasq_node_name is not set! Which dnsmasq should I use?")
             raise Error
 
-        dnsmasq_update_service_string_handle = '{}/upd_host'.format(self.DnsMasqNodeName)
+        dnsmasq_update_service_string_handle = '/{}/upd_host'.format(self.DnsMasqNodeName) ## this is global for now
+        rospy.loginfo("Waiting for {} to be alive.".format(dnsmasq_update_service_string_handle))
         rospy.wait_for_service(dnsmasq_update_service_string_handle)
         self.update_hosts = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
         rospy.logwarn("dnsmasq finished setting up")
 
+    # def handle_register_dmi(self,req):
+    #     signal_kill_dmis_string_handle = '{}/perish'.format(req.MyString)
+    #     self.signal_kill_dmis.append( signal_kill_dmis_string_handle)
+    #     # self.signal_kill_dmis.append( rospy.ServiceProxy(signal_kill_dmis_string_handle, Empty))
+    #     rospy.logdebug("current list of linked DMIs: {}".format(self.signal_kill_dmis))
+    #     rospy.set_param("~allDMIs",self.signal_kill_dmis)
+    #     return GenericStringResponse()
+
     def handle_register_dmi(self,req):
-        signal_kill_dmis_string_handle = '{}/perish'.format(req.MyString)
-        self.signal_kill_dmis.append( signal_kill_dmis_string_handle)
+        signal_kill_dmis_string_handle = '{}/perish'.format(req.DMIName)
+        self.signal_kill_dmis[signal_kill_dmis_string_handle] = req.Level
         # self.signal_kill_dmis.append( rospy.ServiceProxy(signal_kill_dmis_string_handle, Empty))
-        rospy.logdebug("current list of linked DMIs: {}".format(self.signal_kill_dmis))
+        rospy.logwarn("current dic of linked DMIs: {}".format(self.signal_kill_dmis))
         rospy.set_param("~allDMIs",self.signal_kill_dmis)
-        return GenericStringResponse()
+        return DMILevelResponse()
 
     def handle_update_host(self,req):
         rospy.logwarn("update hosts called")
@@ -316,19 +346,60 @@ class DockerMaster(DockerLoggedNamed):
         return RmDockerMachineResponse()
 
     def die(self,req):
-        rospy.signal_shutdown("Bye.")
+        rospy.logwarn("Die called. Shutting down sequence initiated")
+        self.keep_alive = False
         return EmptyResponse()
 
-    def close(self):
-        for dieSrv in self.signal_kill_dmis:
-            dieSrv()
+    def kill_everything(self):
+        rospy.logwarn("Kill everything called. Shutting down every docker node")
+        better_dmi_kill_vec, level_list = parse_dic_into_tree(self.signal_kill_dmis)
+        for level in level_list:
+            for dieSrv in better_dmi_kill_vec[level]:
+                try:
+                    rospy.ServiceProxy(dieSrv, Empty)()
+                except:
+                    ##maybe already closed. I am not going to be too precise here, or I will be solving this problem forever.
+                    rospy.logdebug("Could not end: {}\n\tIs it already finished?".format(dieSrv))
+
+    def  __exit__(self, *exc):
         rospy.loginfo("Shutting down. Waiting for other processes to close") ## this is a lie and it will fail if anything takes less than N seconds to close. I need to actually do this, hook them and then get the closure notice
-        time.sleep(3)
+        self.keep_alive = False
+
+def parse_dic_into_tree(dic_dic):
+    currlevel = 0
+    tree = {}
+    currlevel_list = []
+    while dic_dic:
+        while currlevel >=0:
+            for item,level in dic_dic.iteritems():
+                currlevel = max([currlevel,level])
+            currlevel_list.append(currlevel)
+            for item,level in dic_dic.iteritems():
+                #print(tree)
+                if level == currlevel:
+                    thislevel = dic_dic.pop(item)
+                    if thislevel in tree:
+                        ##already has element in this level, then append to list
+                        tree[thislevel].append(item)
+                    else: ## create a list with one element
+                        tree[thislevel] = [item]
+                    currlevel=0
+                    break
+            break
+    level_list = list(set(currlevel_list))
+    level_list.reverse()
+    return tree, level_list
+
+#aa = {"a":1,"b":2,"c":2,"d":3,"e":1}
+#parse_dic_into_tree(aa)
 
 if __name__ == '__main__':
-    try:
-        master = DockerMaster()
-        master.startup()
-        rospy.spin()
-    except rospy.ROSInterruptException:
-        pass
+    master = DockerMaster()
+    #with DockerMaster() as master:
+    with master:
+        while(True):
+            master.rate.sleep()
+            if not master.keep_alive:
+                master.kill_everything()
+                master.rate.sleep()
+                break

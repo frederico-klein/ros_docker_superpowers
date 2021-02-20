@@ -59,7 +59,7 @@ class TubVolume(DockerLogged):
         self.TubPath = tub_path
         self.WsPath = ws_path
         ###attempts to find docker_master
-        self.DMI = DMI()
+        self.DMI = DMI(1)
 
         ##Now I will register myself with the master
         #rospy.get_param("{}/TubVolumeDic".format(self.master))
@@ -120,7 +120,10 @@ class TubVolume(DockerLogged):
 
     def close(self):
         rospy.loginfo("Shutting down. Deleting volume {}".format(self.Name))
-        self.DMI.rmVolume(self.Name)
+        try:
+            self.DMI.rmVolume(self.Name)
+        except:
+            rospy.logwarn("Removing volume from docker master host list failed. Some docker services may be left dangling!")
         self.lspPopenRetry(['docker','volume','rm',self.Name])
 
 if __name__ == '__main__':

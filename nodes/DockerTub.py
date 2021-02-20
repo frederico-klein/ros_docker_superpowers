@@ -74,7 +74,7 @@ class Tub(DockerLoggedNamed):
         self.afps("TubName"     ,"container_hostname")
         self.afps("UseGpu"      ,"use_gpu")
 
-        self.DMI = DMI()
+        self.DMI = DMI(2)
         ###here I need to get the TubVolume's properies.
         self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume)
         #self.Display = ":0"
@@ -109,12 +109,19 @@ class Tub(DockerLoggedNamed):
                  "-h","{}".format(self.TubName),
                  "--network={}".format(self.NetworkName),
                  "--ip={}".format(self.IP),
+                 self.get_dns(),
                  self.ImageName,
                  self.get_entrypoint()
              ]
             #print(flatten(proc_list))
             self.lspPopen(flatten(proc_list))
         rospy.on_shutdown(self.close)
+
+    def get_dns(self):
+        if self.DMI.UseDnsMasq:
+            return ["--dns",self.DMI.dnsmasqIP]
+        else:
+            return []
 
     def get_use_gpu(self):
         if self.UseGpu:
@@ -133,7 +140,10 @@ class Tub(DockerLoggedNamed):
         if not silent:
             rospy.loginfo("Starting shutting down sequence for {}.".format(self.Name))
         if not reset:
-            self.DMI.rmHost(self.TubName, self.HostName)
+            try:
+                self.DMI.rmHost(self.TubName, self.HostName)
+            except:
+                rospy.logwarn("Could not remove host from Docker Master host list. Some docker containers, volumes or bridge may be dangling!")
 
         output = self.oLspPopen(['docker','ps'])
 
