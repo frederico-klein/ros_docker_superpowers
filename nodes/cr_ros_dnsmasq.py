@@ -9,7 +9,7 @@ from std_srvs.srv import Empty
 
 class DnsMasqTub(Tub):
     def __init__(self):
-        super(DnsMasqTub, self).__init__()
+        super(DnsMasqTub, self).__init__(2, dns_check = False)
         self.rospack = rospkg.RosPack()
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
 

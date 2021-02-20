@@ -39,7 +39,8 @@ class Tub(DockerLoggedNamed):
             container_hostname=               "torch_machine4",
             dockerfile_directory=   "."             ,
             containerip=              "172.28.5.31",
-            use_gpu=                "True"   ):
+            use_gpu=                "True",
+            dns_check = True):
         super(Tub, self).__init__()
         self.Name = name
         self.NetworkName = network_name
@@ -49,6 +50,7 @@ class Tub(DockerLoggedNamed):
         self.DockerfileDirectory = dockerfile_directory
         self.IP = containerip
         self.UseGpu = use_gpu
+        self.DnsCheck = dns_check
 
         rospy.init_node('docker_tub', anonymous=True, log_level=rospy.DEBUG)
 
@@ -64,6 +66,7 @@ class Tub(DockerLoggedNamed):
             ])
 
     def post_init(self):
+        rospy.logwarn("started post_init")
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
         ## this is the best I could do with python 2.7 and my python fu
 
@@ -74,13 +77,18 @@ class Tub(DockerLoggedNamed):
         self.afps("TubName"     ,"container_hostname")
         self.afps("UseGpu"      ,"use_gpu")
 
-        self.DMI = DMI(2)
+        self.DMI = DMI(2, dns_check = self.DnsCheck)
         ###here I need to get the TubVolume's properies.
-        self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume)
+        try:
+            self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume)
+        except:
+            rospy.loginfo("Could not get tubvolume path. Will not mount or fail.")
         #self.Display = ":0"
 
         self.afps("DockerfileDirectory"  , "dockerfile_directory")
         self.afps("IP"                   , "containerip"           )
+
+        rospy.logwarn("trying to add host to HostList")
 
         self.DMI.addHost(self.TubName, self.HostName, self.IP)
         rospy.loginfo("Added host to DMI OK.")
@@ -118,7 +126,7 @@ class Tub(DockerLoggedNamed):
         rospy.on_shutdown(self.close)
 
     def get_dns(self):
-        if self.DMI.UseDnsMasq:
+        if self.DMI.master.UseDnsMasq:
             return ["--dns",self.DMI.dnsmasqIP]
         else:
             return []

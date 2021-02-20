@@ -46,7 +46,7 @@ class NoMaster(Error):
         rospy.signal_shutdown(self.message)
 
 class DockerMasterInterface():
-    def __init__(self, level):
+    def __init__(self, level, dns_check = True):
         self.master = DockerMaster()
         self.rate = rospy.Rate(3)
         self.master_handle = self.get_master()
@@ -59,7 +59,6 @@ class DockerMasterInterface():
             try:
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
-                self.master.UseDnsMasq =  rosparam.get_param("{}/UseDnsMasq".format(self.master_handle))
                 self.add_vol = rospy.ServiceProxy('{}/add_volume'.format(self.master_handle), addVolume)
                 self.rm_vol = rospy.ServiceProxy('{}/rm_volume'.format(self.master_handle), RmVolume)
                 self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
@@ -84,11 +83,17 @@ class DockerMasterInterface():
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
                 raise Exception
+        if dns_check:
+            while(not rosparam.get_param("{}/dnsmasqIP".format(self.master_handle))):
+                rospy.loginfo("Waiting for dns to be present.")
+                self.rate.sleep()
+            self.dnsmasqIP = rosparam.get_param("{}/dnsmasqIP".format(self.master_handle))
 
         rospy.loginfo("DMI init OK. ")
 
     def register_dnsmasq(self, IP):
         self.dnsmasqIP = IP
+        rosparam.set_param("{}/dnsmasqIP".format(self.master_handle), IP)
         rospy.loginfo("Registered dnsmasq server at {}".format(IP))
 
     def get_ws_volume_by_name(self,name):
@@ -193,7 +198,7 @@ class DockerMasterInterface():
     #
     #     ##first close everyone but self
     #     ###compile list of DMIs to kill:
-    #     rospy.logwarn("removing all other dmis:")
+    #     rospy.logwarn("removing all other dmis:")resolver.query
     #     dmi_list = rosparam.get_param("{}/allDMIs".format(self.master_handle))
     #     ##do a set difference to get everone but self:
     #     dmis_to_kill = set(dmi_list)-set(self.node_name)
@@ -227,6 +232,8 @@ class DockerMaster(DockerLoggedNamed):
         self.DnsMasqNodeName = ""
         self.UseDnsMasq = False
         self.keep_alive = True
+        self.dnsmasqIP = ""
+        self.resolver = dns.resolver.Resolver()
 
     def __enter__(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
@@ -246,6 +253,7 @@ class DockerMaster(DockerLoggedNamed):
         self.rate = rospy.Rate(1)
 
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
+        rospy.set_param("~dnsmasqIP",self.dnsmasqIP)
         rospy.set_param("~HostDic",self.HostDic)
         self.addVolumeSrv = rospy.Service('~add_volume', addVolume, self.handle_add_volume)
         self.rmVolumeSrv = rospy.Service('~rm_volume', RmVolume, self.handle_rm_volume)
@@ -266,9 +274,10 @@ class DockerMaster(DockerLoggedNamed):
         if self.UseDnsMasq:
             self.setup_dnsmasq()
 
-        self.resolver = dns.resolver.Resolver()
+
         # TODO: make parameter?
         self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
+
 
     def setup_dnsmasq(self):
         rospy.logwarn("dnsmasq set!")
@@ -279,7 +288,7 @@ class DockerMaster(DockerLoggedNamed):
         dnsmasq_update_service_string_handle = '/{}/upd_host'.format(self.DnsMasqNodeName) ## this is global for now
         rospy.loginfo("Waiting for {} to be alive.".format(dnsmasq_update_service_string_handle))
         rospy.wait_for_service(dnsmasq_update_service_string_handle)
-        self.update_hosts = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
+        self.update_hosts_DNS = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
         rospy.logwarn("dnsmasq finished setting up")
 
     # def handle_register_dmi(self,req):
@@ -301,12 +310,19 @@ class DockerMaster(DockerLoggedNamed):
     def handle_update_host(self,req):
         rospy.logwarn("update hosts called")
         self.update_hosts()
+        rospy.logwarn("update hosts ended okay")
+
         return EmptyResponse()
 
     def update_hosts(self):
         HostList = {}
+        rospy.logwarn("update host inner loop called")
+        rospy.logwarn(self.HostDic)
         for hostName, tubIpDic in self.HostDic.iteritems():
-            HostList[hostName] = socket.gethostbyname(hostName)
+            HostList[hostName] = self.resolver.query(hostName)[0].to_text()
+            rospy.logdebug(HostList)
+            #this fails often
+            #HostList[hostName] = socket.gethostbyname(hostName)
         self.DockerHosts = HostList
         rospy.loginfo("Current known list of hosts: {}".format(self.DockerHosts))
 
