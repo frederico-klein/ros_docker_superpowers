@@ -247,6 +247,7 @@ class DockerMaster(DockerLoggedNamed):
         self.dnsmasqIP = ""
         self.resolver = dns.resolver.Resolver()
         self.dns_ready = False
+        self.DockerHosts = []
 
     def __enter__(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
@@ -269,6 +270,7 @@ class DockerMaster(DockerLoggedNamed):
         rospy.set_param("~TubVolumeDic",self.TubVolumeDic)
         rospy.set_param("~dnsmasqIP",self.dnsmasqIP)
         rospy.set_param("~HostDic",self.HostDic)
+        rospy.set_param("~docker_hosts",self.DockerHosts)
         ##this is dirty! I dont understand why I did it like this anymore. this needs cleaning
         self.afps("UseDnsMasq","use_dnsmasq")
         rospy.set_param("~UseDnsMasq",self.UseDnsMasq)
@@ -345,6 +347,7 @@ class DockerMaster(DockerLoggedNamed):
             #this fails often
             #HostList[hostName] = socket.gethostbyname(hostName)
         self.DockerHosts = HostList
+        rospy.set_param("docker_hosts", self.DockerHosts)
         if self.UseDnsMasq and self.dns_ready:
             self.update_hosts_DNS()
         rospy.loginfo("Current known list of hosts: {}".format(self.DockerHosts))
