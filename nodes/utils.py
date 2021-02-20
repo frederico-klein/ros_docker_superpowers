@@ -3,14 +3,32 @@
 
 import rospy
 import subprocess
+import socket
+
 #import re
 
 class DockerLogged(object):
 
     def __init__(self):
         self.proc_list = []
-
+        self.Name = ""
+        self.ownHostName = socket.gethostname()
+        self.attachOwnHostNameToDockerNames = False
+        self.warnedAboutName = False
         rospy.on_shutdown(self.__ultraclose)
+
+    def TrueName(self):
+        fullname = self.Name+"."+self.ownHostName
+        if self.attachOwnHostNameToDockerNames:
+            if not self.warnedAboutName:
+                rospy.loginfo("hostname_as_suffix set. Changing name from {} to {}".format(self.Name, fullname ))
+                self.warnedAboutName = True
+            return fullname
+        else:
+            return self.Name
+
+    def FullName(self):
+        return self.Name+"."+self.ownHostName
 
     #def afps(self, owner, private_name, classatrname):
     def afps(self, classatrname, private_name, default_attribute = ""):
@@ -72,7 +90,12 @@ class DockerLogged(object):
 
 class DockerLoggedNamed(DockerLogged):
     def updateHostName(self):
-        self.HostName = rospy.get_node_uri().split("/")[2].split(":")[0]
+        self.RosHostName = rospy.get_node_uri().split("/")[2].split(":")[0]
+        rospy.logdebug(self.RosHostName)
+        rospy.logdebug(self.ownHostName)
+
+        #assert(self.HostName is self.ownHostName) # maybe they will differ if ROS_HOSTNAME is used; I still don't know which one will be correct.
         ##Should not be an afps parameter because I don't want it to be changed
-        rospy.logdebug("Hostname running this node: {}".format(self.HostName))
-        rospy.set_param("~HostName",self.HostName)
+        rospy.logdebug("Hostname running this node: {}".format(self.RosHostName))
+        rospy.logdebug("Own Hostname running this node: {}".format(self.ownHostName))
+        rospy.set_param("~HostName",self.ownHostName)

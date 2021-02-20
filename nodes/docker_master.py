@@ -96,14 +96,14 @@ class DockerMasterInterface():
         rosparam.set_param("{}/dnsmasqIP".format(self.master_handle), IP)
         rospy.loginfo("Registered dnsmasq server at {}".format(IP))
 
-    def get_ws_volume_by_name(self,name):
+    def get_ws_volume_by_name(self,name, tries = 10):
 
         try:
             ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
-            tries = 10
             while tries >0:
                 ###It doesnt make sense not to update this. Idk what I was thinking
                 self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
+                rospy.logdebug("VolumeDic: {}".format(self.master.TubVolumeDic))
                 if len(self.master.TubVolumeDic) != 0 and name in self.master.TubVolumeDic:
                     break
                 else:
@@ -115,11 +115,10 @@ class DockerMasterInterface():
 
         return self.master.TubVolumeDic[name]
 
-    def get_ws_host_by_name(self,name):
+    def get_ws_host_by_name(self,name, tries = 10):
 
         try:
             ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
-            tries = 10
             while tries >0:
                 ###It doesnt make sense not to update this. Idk what I was thinking
                 self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))

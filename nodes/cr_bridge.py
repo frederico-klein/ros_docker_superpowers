@@ -6,10 +6,10 @@
 ## creates the bridge.
 
 import rospy
-from utils import DockerLogged
+from utils import DockerLoggedNamed
 
 
-class DockerBridge(DockerLogged):
+class DockerBridge(DockerLoggedNamed):
     """
     This can be invoked with something like:
     from cr_bridge import DockerBridge
@@ -48,6 +48,7 @@ class DockerBridge(DockerLogged):
         self.afps("Subnet"  ,"subnet"    )
         self.afps("IPRange" ,"iprange"   )
         self.afps("Gateway" ,"gateway"   )
+        # self.afps("attachOwnHostNameToDockerNames", "hostname_as_suffix")
 
         rospy.loginfo("Creating bridge {}".format(self.Name))
         ##check if there is a bridge already
