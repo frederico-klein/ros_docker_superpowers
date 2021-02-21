@@ -296,7 +296,6 @@ class DockerMaster(DockerLoggedNamed):
 
 
         #rospy.set_param("~TubVolumeDic",[])
-        #rospy.on_shutdown(self.close)
 
         rospy.set_param("~Ready", True) ### this needs toi be before the setup_dnsmasq or it will enter in a deadlock
 
