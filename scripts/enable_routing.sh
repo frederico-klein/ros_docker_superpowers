@@ -19,4 +19,4 @@ else
   echo "forwarding rule seems to be set"
 fi
 
-sudo route add -net 172.28.0.0 netmask 255.255.255.0 gw $DOCKERROUTERIP
+sudo route add -net 172.28.0.0 netmask 255.255.0.0 gw $DOCKERROUTERIP
