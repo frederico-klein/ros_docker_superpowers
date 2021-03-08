@@ -176,7 +176,7 @@ class DockerMasterInterface():
                 rospy.logwarn("Docker Master not found yet. Is it running? Will retry {} more times.".format(tries))
                 self.rate.sleep()
 
-        rospy.logdebug("rosnodes are: {}".format(rosnode.get_node_names()))
+        rospy.loginfo("rosnodes are: {}".format(rosnode.get_node_names()))
         rospy.logfatal("Didn't find master. ")
         raise NoMaster()
             #print("hello")
