@@ -91,7 +91,8 @@ class DockerMasterInterface():
                 #mySrvCall.Level = level
                 #mySrvCall.DMIName = self.node_name
                 #self.register_dmi(mySrvCall)
-                self.register_dmi( self.node_name, level)
+                if level>0:
+		    self.register_dmi( self.node_name, level)
 
                 rospy.on_shutdown(self.close)
 
