@@ -69,7 +69,6 @@ class DockerBridge(DockerLoggedNamed):
             "--gateway={}".format(self.Gateway),
             self.Name]
         self.lspPopen(list_args)
-        rospy.on_shutdown(self.close)
         self.DMI = DMI(1)
 
     def close(self):
@@ -86,3 +85,5 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+    finally:
+        myDockerBridge.close()

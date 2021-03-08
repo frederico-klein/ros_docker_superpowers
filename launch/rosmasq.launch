@@ -6,7 +6,7 @@
     <param name="network_name"            type="string"      value="br0"          />
     <param name="container_hostname"      type="string"      value="rosdnsmasq1"  />
     <param name="dockerfile_directory"    type="string"      value="."            />
-    <param name="containerip"             type="string"      value="172.28.5.53"  />
+    <param name="containerip"             type="string"      value="172.28.6.53"  />
     <param name="use_gpu"                 type="bool"        value="False"        />
   </node>
 </launch>

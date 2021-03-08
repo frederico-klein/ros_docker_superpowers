@@ -66,7 +66,7 @@ class DnsMasqTub(Tub):
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it
         self.close(silent = True, reset = True)
-        self.create(recreate = True)
+        self.create()
 
     def get_dns(self): ##I am providing the dns here. we don't want a loop
         return []
@@ -92,3 +92,5 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+    finally:
+        dnsmasqTub.close()

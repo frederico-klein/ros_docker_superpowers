@@ -91,7 +91,7 @@ class Tub(DockerLoggedNamed):
         self.DMI.addHost(self.TubName, self.ownHostName, self.IP)
         rospy.loginfo("Added host to DMI OK.")
 
-    def create(self, recreate = False):
+    def create(self):
         rospy.loginfo("Mounting docker image {}".format(self.Name))
 
         ##check if there is a volume already
@@ -122,8 +122,6 @@ class Tub(DockerLoggedNamed):
             #print(self.FullName())
             print(flatten(proc_list))
             self.lspPopen(flatten(proc_list))
-        if not recreate:
-            rospy.on_shutdown(self.close)
 
     def get_dns(self):
         if self.DMI.master.UseDnsMasq:
@@ -190,3 +188,5 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+    finally:
+        myTub.close()

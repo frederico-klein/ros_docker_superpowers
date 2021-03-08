@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+DOCKERROUTERIP=192.168.0.9
 AMIFORWARDING=`sysctl net.ipv4.conf.all.forwarding | grep 1`
 ISIPTABLESSET=`sudo iptables -S | grep "\-P FORWARD ACCEPT"`
 
@@ -17,3 +18,5 @@ then
 else
   echo "forwarding rule seems to be set"
 fi
+
+sudo route add -net 172.28.0.0 netmask 255.255.0.0 gw $DOCKERROUTERIP

@@ -55,6 +55,9 @@ class DockerMasterInterface():
             setattr(self.master, par, value)
         rospy.logdebug(dir(self.master))
 
+    def signal_death(self):
+        rospy.logwarn("signal_death not initialized but called. you have an inconsistent behaviour in your code!")
+
     def __init__(self, level, dns_check = True):
         self.master = DockerMaster()
         self.rate = rospy.Rate(1)
@@ -79,21 +82,26 @@ class DockerMasterInterface():
                 self.add_host = rospy.ServiceProxy('{}/add_host'.format(self.master_handle), addDockerMachine)
                 self.rm_host = rospy.ServiceProxy('{}/rm_host'.format(self.master_handle), RmDockerMachine)
                 self.update_hosts = rospy.ServiceProxy('{}/upd_host'.format(self.master_handle), Empty)
-                self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
 
-                self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
 
                 # self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), GenericString)
                 # self.register_dmi(self.node_name)
 
-                self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), DMILevel)
+
                 #mySrvCall = DMILevel()
                 #mySrvCall.Level = level
                 #mySrvCall.DMIName = self.node_name
                 #self.register_dmi(mySrvCall)
-                self.register_dmi( self.node_name, level)
+                if level>0:
+                    rospy.logwarn("DMI registered as essential. Any error here will shutdown docker_master and all DMI linked nodes!")
+                    self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
+                    self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
+                    self.register_dmi = rospy.ServiceProxy('{}/register_dmi'.format(self.master_handle), DMILevel)
+                    self.register_dmi( self.node_name, level)
+                    rospy.on_shutdown(self.close)
+                else:
+                    rospy.loginfo("DMI registered as non-essential.")
 
-                rospy.on_shutdown(self.close)
 
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
@@ -168,14 +176,14 @@ class DockerMasterInterface():
                 rospy.logwarn("Docker Master not found yet. Is it running? Will retry {} more times.".format(tries))
                 self.rate.sleep()
 
-        if "docker_master" not in rosnode.get_node_names():
-            rospy.logfatal("Didn't find master. ")
-            raise NoMaster()
+        rospy.loginfo("rosnodes are: {}".format(rosnode.get_node_names()))
+        rospy.logfatal("Didn't find master. ")
+        raise NoMaster()
             #print("hello")
             #self.master = DockerMaster()
             ## let's wait for the dockerMaster services here:
 
-            return None
+        return None
     def addVolume(self,VolumeName, WsPath):
         rospy.loginfo("Service add volume called.")
         self.add_vol(VolumeName, WsPath)
@@ -296,7 +304,6 @@ class DockerMaster(DockerLoggedNamed):
 
 
         #rospy.set_param("~TubVolumeDic",[])
-        #rospy.on_shutdown(self.close)
 
         rospy.set_param("~Ready", True) ### this needs toi be before the setup_dnsmasq or it will enter in a deadlock
 

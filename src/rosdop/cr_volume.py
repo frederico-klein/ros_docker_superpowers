@@ -101,8 +101,6 @@ class TubVolume(DockerLoggedNamed):
             #procTubVolumeCreate = subprocess.Popen(list_args, stdout=subprocess.PIPE)
             self.lspPopen(list_args)
 
-        rospy.on_shutdown(self.close)
-
     def close(self):
         rospy.loginfo("Shutting down. Deleting volume {}".format(self.Name))
         try:
@@ -126,6 +124,8 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+    finally:
+        myTubVolume.close()
 
 
             # list_args = [
