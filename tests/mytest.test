@@ -1,0 +1,4 @@
+<launch>
+  <param name="string"  value="mystring" />
+  <test test-name="test_string_params" pkg="rosdop" type="test_bare_bones.py" />
+</launch>

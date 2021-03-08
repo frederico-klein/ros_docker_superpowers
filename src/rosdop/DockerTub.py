@@ -39,7 +39,8 @@ class Tub(DockerLoggedNamed):
             container_hostname=               "torch_machine4",
             dockerfile_directory=   "."             ,
             containerip=              "172.28.5.31",
-            use_gpu=                "True"   ):
+            use_gpu=                "True",
+            dns_check = True):
         super(Tub, self).__init__()
         self.Name = name
         self.NetworkName = network_name
@@ -49,6 +50,7 @@ class Tub(DockerLoggedNamed):
         self.DockerfileDirectory = dockerfile_directory
         self.IP = containerip
         self.UseGpu = use_gpu
+        self.DnsCheck = dns_check
 
         rospy.init_node('docker_tub', anonymous=True, log_level=rospy.DEBUG)
 
@@ -64,6 +66,7 @@ class Tub(DockerLoggedNamed):
             ])
 
     def post_init(self):
+        rospy.logwarn("started post_init")
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
         ## this is the best I could do with python 2.7 and my python fu
 
@@ -73,16 +76,19 @@ class Tub(DockerLoggedNamed):
         self.afps("TubVolume"   ,"tub_volume"    )
         self.afps("TubName"     ,"container_hostname")
         self.afps("UseGpu"      ,"use_gpu")
+        # self.afps("attachOwnHostNameToDockerNames", "hostname_as_suffix")
 
-        self.DMI = DMI()
+        self.DMI = DMI(2, dns_check = self.DnsCheck)
         ###here I need to get the TubVolume's properies.
-        self.WsPath = self.DMI.get_ws_volume_by_name(self.TubVolume)
+
         #self.Display = ":0"
 
         self.afps("DockerfileDirectory"  , "dockerfile_directory")
         self.afps("IP"                   , "containerip"           )
 
-        self.DMI.addHost(self.TubName, self.HostName, self.IP)
+        rospy.logwarn("trying to add host to HostList")
+
+        self.DMI.addHost(self.TubName, self.ownHostName, self.IP)
         rospy.loginfo("Added host to DMI OK.")
 
     def create(self):
@@ -106,15 +112,22 @@ class Tub(DockerLoggedNamed):
                  #"-e","DISPLAY=$DISPLAY",
                  #"-v","/tmp/.X11-unix:/tmp/.X11-unix",
                  self.get_own_volumes(),
-                 "-h","{}".format(self.TubName),
+                 "-h","{}".format(self.TubName+"."+self.ownHostName),
                  "--network={}".format(self.NetworkName),
                  "--ip={}".format(self.IP),
+                 self.get_dns(),
                  self.ImageName,
                  self.get_entrypoint()
              ]
-            #print(flatten(proc_list))
+            #print(self.FullName())
+            print(flatten(proc_list))
             self.lspPopen(flatten(proc_list))
-        rospy.on_shutdown(self.close)
+
+    def get_dns(self):
+        if self.DMI.master.UseDnsMasq:
+            return ["--dns",self.DMI.dnsmasqIP]
+        else:
+            return []
 
     def get_use_gpu(self):
         if self.UseGpu:
@@ -123,6 +136,12 @@ class Tub(DockerLoggedNamed):
             return []
 
     def get_own_volumes(self):
+        try:
+            fullTubName = self.TubVolume+"."+self.ownHostName
+            ##the way I am using this, volumes are all local
+            self.WsPath = self.DMI.get_ws_volume_by_name(fullTubName, tries = 10)
+        except:
+            rospy.logerr("Could not get tubvolume path {}. Will not mount or fail.".format(fullTubName))
         return   ["-v","{}:{}".format(self.TubVolume,self.WsPath),
                  "-v","/mnt/share:/mnt/share"]
 
@@ -131,33 +150,36 @@ class Tub(DockerLoggedNamed):
 
     def close(self, silent = False, reset = False):
         if not silent:
-            rospy.loginfo("Starting shutting down sequence for {}.".format(self.Name))
+            rospy.loginfo("Starting shutting down sequence for {}.".format(self.FullName()))
         if not reset:
-            self.DMI.rmHost(self.TubName, self.HostName)
+            try:
+                self.DMI.rmHost(self.TubName, self.ownHostName)
+            except:
+                rospy.logwarn("Could not remove host from Docker Master host list. Some docker containers, volumes or bridge may be dangling!")
 
         output = self.oLspPopen(['docker','ps'])
 
         if self.Name in output: #if there isn't create one
-            rospy.loginfo("Found {} docker container found to be running. Now stopping... ".format(self.Name))
+            rospy.loginfo("Found {} docker container found to be running, locally run as {}. Now stopping... ".format(self.FullName(), self.Name))
             ##docker stop kill or rm???
             self.lspPopenRetry(['docker','stop',self.Name])
             rospy.loginfo("Stop okay.")
         elif silent:
             pass
         else:
-            rospy.logerr("Docker container {} already closed!! There are issues with the container initialization or persistence.".format(self.Name))
+            rospy.logerr("Docker container {}({}) already closed!! There are issues with the container initialization or persistence.".format(self.FullName(), self.Name))
 
         output = self.oLspPopen(['docker','container','ls','-a'])
 
         if self.Name in output: #if there isn't create one
-            rospy.loginfo("Found {} docker container found. Now deleting... ".format(self.Name))
+            rospy.loginfo("Found {} docker container found. Now deleting... ".format(self.FullName()))
             ##docker stop kill or rm???
             self.lspPopenRetry(['docker','rm',self.Name])
             rospy.loginfo("Delete okay. Bye!")
         elif silent:
             pass
         else:
-            rospy.logerr("Unexpected. Docker container {} already deleted.".format(self.Name))
+            rospy.logerr("Unexpected. Docker container {} already deleted.".format(self.FullName()))
 
 if __name__ == '__main__':
     try:
@@ -166,3 +188,5 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+    finally:
+        myTub.close()

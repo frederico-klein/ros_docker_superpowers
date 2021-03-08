@@ -10,7 +10,7 @@ import subprocess
 from docker_master import DockerMasterInterface as DMI
 #from utils import attribute_from_param_setter as afps
 #from utils import logged_subprocess_popen as lspPopen
-from utils import DockerLogged
+from utils import DockerLoggedNamed
 
 # class TubVolumeInterface():
 #     def __init__(self):
@@ -24,7 +24,7 @@ from utils import DockerLogged
 #                     return node
 #         pass
 
-class TubVolume(DockerLogged):
+class TubVolume(DockerLoggedNamed):
     """
     This is a vieux sshfs wrapper. I am calling it tub volume because it will mount always in the same path in a docker host thing (which I am calling a Tub)
     This can be invoked with something like:
@@ -59,29 +59,13 @@ class TubVolume(DockerLogged):
         self.TubPath = tub_path
         self.WsPath = ws_path
         ###attempts to find docker_master
-        self.DMI = DMI()
+        self.DMI = DMI(1)
 
         ##Now I will register myself with the master
         #rospy.get_param("{}/TubVolumeDic".format(self.master))
         rospy.logdebug("Added DMI OK.")
 
     def open(self):
-        ## I want to read the private parameters here, since I already started the node, so I catkin_ws
-
-        #self.Name = rospy.get_param('~name', default = self.Name)
-        #rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~name'), self.Name)
-
-        # self.UserName = rospy.get_param('~username', default = self.UserName)
-        # rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~username'), self.UserName)
-        #
-        # self.IdentityFile = rospy.get_param('~identity_file', default = self.IdentityFile)
-        # rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~identity_file'), self.IdentityFile)
-        #
-        # self.SshfsHostname = rospy.get_param('~sshfs_hostname', default = self.SshfsHostname)
-        # rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~sshfs_hostname'), self.SshfsHostname)
-        #
-        # self.TubPath = rospy.get_param('~tub_path', default = self.TubPath)
-        # rospy.logdebug('Parameter %s has value %s', rospy.resolve_name('~tub_path'), self.TubPath)
 
         self.afps("Name", "name")
         self.afps("UserName", "username")
@@ -89,8 +73,9 @@ class TubVolume(DockerLogged):
         self.afps("SshfsHostname", "sshfs_hostname")
         self.afps("TubPath", "tub_path")
         self.afps("WsPath", "ws_path")
+        # self.afps("attachOwnHostNameToDockerNames", "hostname_as_suffix")
 
-        self.DMI.addVolume(self.Name, self.WsPath)
+        self.DMI.addVolume(self.FullName(), self.WsPath)
         rospy.loginfo("Added volume to DMI OK.")
 
         rospy.loginfo("Creating volume {}".format(self.Name))
@@ -116,11 +101,12 @@ class TubVolume(DockerLogged):
             #procTubVolumeCreate = subprocess.Popen(list_args, stdout=subprocess.PIPE)
             self.lspPopen(list_args)
 
-        rospy.on_shutdown(self.close)
-
     def close(self):
         rospy.loginfo("Shutting down. Deleting volume {}".format(self.Name))
-        self.DMI.rmVolume(self.Name)
+        try:
+            self.DMI.rmVolume(self.FullName())
+        except:
+            rospy.logwarn("Removing volume from docker master host list failed. Some docker services may be left dangling!")
         self.lspPopenRetry(['docker','volume','rm',self.Name])
 
 if __name__ == '__main__':
@@ -138,6 +124,8 @@ if __name__ == '__main__':
 
     except rospy.ROSInterruptException:
         pass
+    finally:
+        myTubVolume.close()
 
 
             # list_args = [
@@ -147,4 +135,4 @@ if __name__ == '__main__':
             # "-o","IdentityFile={}".format(self.IdentityFile),
             # "-o","sshfs_debug",
             # #"-o","password={}".format("please_dont_put_your_password_here_like_ever"),
-            # self.Name]
+            # self.FullName()]

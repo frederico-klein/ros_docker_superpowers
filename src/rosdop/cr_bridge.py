@@ -6,10 +6,10 @@
 ## creates the bridge.
 
 import rospy
-from utils import DockerLogged
+from utils import DockerLoggedNamed
+from docker_master import DockerMasterInterface as DMI
 
-
-class DockerBridge(DockerLogged):
+class DockerBridge(DockerLoggedNamed):
     """
     This can be invoked with something like:
     from cr_bridge import DockerBridge
@@ -33,6 +33,7 @@ class DockerBridge(DockerLogged):
         self.Gateway = gateway
         rospy.init_node('docker_bridge', anonymous=True, log_level=rospy.DEBUG)
 
+
     def create(self):
         ## I want to read the private parameters here, since I already started the node, so I catkin_ws
         # self.Name = rospy.get_param('~name', default = self.Name)
@@ -48,6 +49,7 @@ class DockerBridge(DockerLogged):
         self.afps("Subnet"  ,"subnet"    )
         self.afps("IPRange" ,"iprange"   )
         self.afps("Gateway" ,"gateway"   )
+        # self.afps("attachOwnHostNameToDockerNames", "hostname_as_suffix")
 
         rospy.loginfo("Creating bridge {}".format(self.Name))
         ##check if there is a bridge already
@@ -67,7 +69,7 @@ class DockerBridge(DockerLogged):
             "--gateway={}".format(self.Gateway),
             self.Name]
         self.lspPopen(list_args)
-        rospy.on_shutdown(self.close)
+        self.DMI = DMI(1)
 
     def close(self):
         rospy.loginfo("Shutting down. Deleting bridge {}".format(self.Name))
@@ -83,3 +85,5 @@ if __name__ == '__main__':
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
+    finally:
+        myDockerBridge.close()
