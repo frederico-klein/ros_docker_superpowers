@@ -109,6 +109,7 @@ class Tub(DockerLoggedNamed):
                  "--name", self.Name,
                  "-t","-d",
                  "-u","root",
+                 "--publish-all", ##maybe I also need to expose it in the container. hopefully not
                  #"-e","DISPLAY=$DISPLAY",
                  #"-v","/tmp/.X11-unix:/tmp/.X11-unix",
                  self.get_own_volumes(),

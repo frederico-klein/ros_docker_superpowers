@@ -8,12 +8,14 @@ import subprocess
 from rosdop.docker_master import DockerMasterInterface as DMI
 
 rospy.init_node("transient_test_node", anonymous=True, log_level=rospy.DEBUG)
+## NOTE: http://wiki.ros.org/rostest/Connecting%20to%20the%20rostest%20master
+## Rostest master is transient, so you need to run this test with a roslaunch
+## otherwise it will not connect to an existing master.
+
 myDMI = DMI(-1) ## so it doesnt close everything
-## A sample python unit test
+
 class TestBareBones(unittest.TestCase):
-    ## test 1 == 1
-    def test_one_equals_one(self): # only functions with 'test_'-prefix will be run!
-        self.assertEquals(1, 1, "1!=1")
+
     def test_ping_everthing(self):
         for a_host, ip in myDMI.master.docker_hosts.iteritems():
             self.ping_hosts(a_host)
@@ -39,6 +41,7 @@ class TestBareBones(unittest.TestCase):
         rospy.logerr(errorout)
         expr="Could not ping host: {}".format(a_host)
         self.assertTrue(proc.returncode is 0,expr)
+
 if __name__ == '__main__':
     import rostest
     rostest.rosrun(PKG, 'test_bare_bones', TestBareBones)
