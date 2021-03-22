@@ -6,6 +6,7 @@
 ## creates the bridge.
 
 import rospy
+from std_srvs.srv import Empty, EmptyResponse
 from utils import DockerLoggedNamed
 from docker_master import DockerMasterInterface as DMI
 
@@ -51,11 +52,30 @@ class Tub(DockerLoggedNamed):
         self.IP = containerip
         self.UseGpu = use_gpu
         self.DnsCheck = dns_check
-
+        self.running = False
         rospy.init_node('docker_tub', anonymous=True, log_level=rospy.DEBUG)
+
 
         self.updateHostName()
         self.post_init()
+        ## now reset can exist:
+
+        self.reset_srv_handle = rospy.Service("~reset", Empty, self.reset)
+
+    def reset(self,req):
+        rospy.loginfo("dockertub reset service called.")
+        if self.running:
+            rospy.loginfo("DockerTub running. will try to stop it.")
+            try:
+                ##then close silently but do not deregister
+                self.close(silent = True, reset = True)
+                rospy.loginfo("Dockertub closed okay, spawning new tub now.")
+            except:
+                rospy.logerr("Problem closing dockertub.")
+
+        self.create()
+
+        return EmptyResponse()
 
     def updateBuild(self):
         ## this no longer works for some builds where I wanted nvidia to be present during the build to detect the graphics card and know what to do. I am not 100% sure it ever worked, so it is a maybe on the todo list
@@ -123,6 +143,8 @@ class Tub(DockerLoggedNamed):
             #print(self.FullName())
             print(flatten(proc_list))
             self.lspPopen(flatten(proc_list))
+
+        self.running = True
 
     def get_dns(self):
         if self.DMI.master.UseDnsMasq:
