@@ -6,3 +6,4 @@
 # Google's nameservers, for example
 server=8.8.8.8
 server=8.8.4.4
+server=192.168.0.1
