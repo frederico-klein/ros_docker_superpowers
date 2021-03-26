@@ -62,9 +62,14 @@ class DockerMasterInterface():
     def wait_on_param(self, param, message = "No message given.", tries = 100, check_if_inside = None):
         outparam = None
         realparamname = "{}/{}".format(self.master_handle, param)
+        rospy.logdebug("wait_on_param reached")
+        rospy.logdebug(realparamname)
         while (tries> 0):
             try:
+                rospy.logdebug("trying to read param")
+                rospy.logdebug(rosparam.list_params("/"))
                 outparam = rosparam.get_param(realparamname)
+                rospy.logdebug(outparam)
             except MasterError as ma:
                 ## this is fine. it means the parameter is not there yet, which we expect
                 tries -= 1
