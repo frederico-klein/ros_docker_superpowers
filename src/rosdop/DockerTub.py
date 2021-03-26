@@ -114,9 +114,10 @@ class Tub(DockerLoggedNamed):
 
         self.reset_srv_handle = rospy.Service("~reset", Empty, self.reset)
 
-    def create(self):
+    def create(self, ready_flag = "DNS_Ready"):
         #self.created = True
         rospy.loginfo("Mounting docker image {}".format(self.Name))
+        self.DMI.wait_on_param(ready_flag,"Waiting for master ready flag")
 
         ##check if there is a volume already
         output = self.oLspPopen(['docker','ps'])
