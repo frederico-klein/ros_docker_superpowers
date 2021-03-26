@@ -209,7 +209,12 @@ class DockerMasterInterface():
     def addHost(self,TubName, HostName, IP):
         rospy.loginfo("Service add host called.")
         ## attempt at solving a run issue that happens in the initialization
-        self.wait_on_param("DNS_Ready", check_if = True)
+        #hack
+        if "dns" in TubName:
+            rospy.logwarn("Attention `dns` is a protected word in tub names and will trigger a different check. This is expected to warn for the dns container, but for no other. If you want to get rid of this warning, either change name or update this checking function!")
+            self.wait_on_param("Ready", check_if = True)
+        else:
+            self.wait_on_param("DNS_Ready", check_if = True)
 
         self.add_host(TubName, HostName, IP)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
