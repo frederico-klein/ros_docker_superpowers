@@ -67,9 +67,14 @@ class DockerMasterInterface():
         while (tries> 0):
             try:
                 rospy.logdebug("trying to read param")
-                rospy.logdebug(rosparam.list_params("/"))
+                rospy.logdebug("{},{}".format(realparamname, outparam))
+                rospy.logdebug("all params: {}".format(rosparam.list_params("/")))
                 outparam = rosparam.get_param(realparamname)
-                rospy.logdebug(outparam)
+                if check_if_inside is None or check_if_inside in outparam:
+                    rospy.logdebug("found it. ")
+                    break
+                else:
+                    rospy.logdebug(message)
             except MasterError as ma:
                 ## this is fine. it means the parameter is not there yet, which we expect
                 tries -= 1
@@ -79,13 +84,6 @@ class DockerMasterInterface():
             except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
                 rospy.logerr("Unexpected! {}".format(e))
 
-            if check_if_inside is not None:
-                ## check_if_inside will be a string and we want to see if it is inside outparam
-                rospy.logdebug("{},{}".format(realparamname, outparam))
-                if check_if_inside in outparam:
-                    break
-                else:
-                    rospy.logdebug(message)
         if outparam is None:
             rospy.logerr("Could not get param: {}".format(realparamname))
         return outparam
