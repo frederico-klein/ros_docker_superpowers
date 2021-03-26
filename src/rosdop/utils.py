@@ -4,6 +4,7 @@
 import rospy
 import subprocess
 import socket
+import traceback
 
 #import re
 
@@ -63,11 +64,14 @@ class DockerLogged(object):
                     break
                 else:
                     rospy.logdebug("COMMAND: \n{}\n Did not work yet. Maybe try again in a sec?\nRESPONSE stdout: {}\nerrout: {}".format(list_args, output, errorout))
+                    if proc.returncode is not 0:
+                        rospy.logdebug(repr(traceback.format_stack()))
             else:
                 break
             rospy.sleep(1)
 
         if proc.returncode is not 0:
+            rospy.logerr(repr(traceback.format_stack()))
             rospy.logerr(errorout)
             rospy.signal_shutdown(errorout)
         rospy.logdebug("output:\n{}".format(output))
