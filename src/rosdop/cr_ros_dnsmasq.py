@@ -11,6 +11,8 @@ from std_srvs.srv import Empty
 class DnsMasqTub(Tub):
     def __init__(self):
         super(DnsMasqTub, self).__init__(1.5, dns_check = False)
+
+    def post_init(self): ## makes sure the object always exists.
         self.rospack = rospkg.RosPack()
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
 
@@ -89,8 +91,10 @@ def generate_string_list_for_dnsmasqfile_from_HostDic(HostDic):
 if __name__ == '__main__':
     try:
         dnsmasqTub = DnsMasqTub()
+        dnsmasq.post_init()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
     finally:
-        dnsmasqTub.close()
+        if dnsmasqTub.created:
+            dnsmasqTub.close()

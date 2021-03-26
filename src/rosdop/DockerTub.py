@@ -53,14 +53,13 @@ class Tub(DockerLoggedNamed):
         self.UseGpu = use_gpu
         self.DnsCheck = dns_check
         self.running = False
+        self.created = False
         rospy.init_node('docker_tub', anonymous=True, log_level=rospy.DEBUG)
 
 
         self.updateHostName()
-        self.post_init()
-        ## now reset can exist:
 
-        self.reset_srv_handle = rospy.Service("~reset", Empty, self.reset)
+
 
     def reset(self,req):
         rospy.loginfo("dockertub reset service called.")
@@ -111,7 +110,12 @@ class Tub(DockerLoggedNamed):
         self.DMI.addHost(self.TubName, self.ownHostName, self.IP)
         rospy.loginfo("Added host to DMI OK.")
 
+                ## now reset can exist:
+
+        self.reset_srv_handle = rospy.Service("~reset", Empty, self.reset)
+
     def create(self):
+        #self.created = True
         rospy.loginfo("Mounting docker image {}".format(self.Name))
 
         ##check if there is a volume already
@@ -142,6 +146,7 @@ class Tub(DockerLoggedNamed):
              ]
             #print(self.FullName())
             print(flatten(proc_list))
+            self.created = True
             self.lspPopen(flatten(proc_list))
 
         self.running = True
@@ -207,9 +212,11 @@ class Tub(DockerLoggedNamed):
 if __name__ == '__main__':
     try:
         myTub = Tub()
+        myTub.post_init()
         myTub.create()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
     finally:
-        myTub.close()
+        if myTub.created:
+            myTub.close()
