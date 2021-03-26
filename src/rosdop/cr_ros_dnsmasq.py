@@ -91,7 +91,7 @@ def generate_string_list_for_dnsmasqfile_from_HostDic(HostDic):
 if __name__ == '__main__':
     try:
         dnsmasqTub = DnsMasqTub()
-        dnsmasq.post_init()
+        dnsmasqTub.post_init()
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
