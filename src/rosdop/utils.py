@@ -62,7 +62,7 @@ class DockerLogged(object):
                 if proc.returncode is 0:
                     break
                 else:
-                    rospy.logdebug("COMMAND: {} Did not work yet. Maybe try again in a sec?".format(list_args))
+                    rospy.logdebug("COMMAND: \n{}\n Did not work yet. Maybe try again in a sec?\nRESPONSE stdout: {}\nerrout: {}".format(list_args, output, errorout))
             else:
                 break
             rospy.sleep(1)
