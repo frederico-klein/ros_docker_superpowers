@@ -19,7 +19,7 @@ class DnsMasqTub(Tub):
 
         self.afps("RosDnsMasqPort","ros_dnsmasq_port", default_attribute=10053)
 
-        self.ros_msq_dir = "/tmp/ros_dnsmasq.d/"
+        self.ros_msq_dir = "/tmp/ros_dnsmasq.d"
         if not os.path.exists(self.ros_msq_dir):
             os.makedirs(self.ros_msq_dir)
         rospy.logdebug("Using auxiliary dnsmasq in {}".format(self.ros_msq_dir))

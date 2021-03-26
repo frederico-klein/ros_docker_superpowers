@@ -188,6 +188,7 @@ class Tub(DockerLoggedNamed):
                 rospy.logwarn("Could not remove host from Docker Master host list. Some docker containers, volumes or bridge may be dangling!")
 
         output = self.oLspPopen(['docker','ps'])
+        rospy.logdebug("ouput of docker ps:".format(output))
 
         if self.Name in output: #if there isn't create one
             rospy.loginfo("Found {} docker container found to be running, locally run as {}. Now stopping... ".format(self.FullName(), self.Name))

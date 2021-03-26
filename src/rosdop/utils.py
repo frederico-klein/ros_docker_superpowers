@@ -52,11 +52,12 @@ class DockerLogged(object):
         """
         tries = num_retries
         while tries>0:
+            rospy.logdebug("command being run:{}".format(list_args))
             proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             res = proc.communicate()
-            rospy.logdebug("command being run:{}".format(list_args))
             # output = proc.stdout.read()
             output = res[0]
+            rospy.logdebug("process response: {}".format(output))
             errorout = res[1] # I think
             tries-=1
             if with_retries:
@@ -71,7 +72,8 @@ class DockerLogged(object):
             rospy.sleep(1)
 
         if proc.returncode is not 0:
-            rospy.logerr(repr(traceback.format_stack()))
+            for a_line in repr(traceback.format_stack()):
+                rospy.logerr(a_line)
             rospy.logerr(errorout)
             rospy.signal_shutdown(errorout)
         rospy.logdebug("output:\n{}".format(output))
