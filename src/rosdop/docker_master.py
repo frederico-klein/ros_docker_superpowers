@@ -70,7 +70,7 @@ class DockerMasterInterface():
                 outparam = rosparam.get_param(realparamname)
                 rospy.logdebug("{}: {}".format(realparamname, outparam))
                 #rospy.logdebug("all params: {}".format(rosparam.list_params("/")))
-                if check_if_inside is None or check_if_inside in outparam or check_if:
+                if check_if_inside is None or check_if_inside in outparam or outparam is check_if:
                     rospy.logdebug("found it/ condition met. ")
                     break
                 else:
