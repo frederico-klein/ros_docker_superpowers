@@ -68,7 +68,7 @@ class DockerMasterInterface():
             except MasterError as ma:
                 ## this is fine. it means the parameter is not there yet, which we expect
                 tries -= 1
-                rospy.logdebug(f"waiting on param {realparamname}")
+                rospy.logdebug("waiting on param {}".format(realparamname))
                 rospy.logdebug(message)
                 self.rate.sleep()
             except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
@@ -76,13 +76,13 @@ class DockerMasterInterface():
 
             if check_if_inside is not None:
                 ## check_if_inside will be a string and we want to see if it is inside outparam
-                rospy.logdebug(f"{realparamname}, {outparam}")
+                rospy.logdebug("{},{}".format(realparamname, outparam))
                 if check_if_inside in outparam:
                     break
                 else:
                     rospy.logdebug(message)
         if outparam is None:
-            rospy.logerr(f"Could not get param {realparamname}")
+            rospy.logerr("Could not get param: {}".format(realparamname))
         return outparam
 
     def __init__(self, level, dns_check = True):
