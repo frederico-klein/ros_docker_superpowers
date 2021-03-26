@@ -13,6 +13,7 @@ class DnsMasqTub(Tub):
         super(DnsMasqTub, self).__init__(1.5, dns_check = False)
 
     def post_init(self): ## makes sure the object always exists.
+        super(DnsMasqTub, self).post_init()
         self.rospack = rospkg.RosPack()
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
 
@@ -46,9 +47,8 @@ class DnsMasqTub(Tub):
         rospy.logdebug("generating file {}".format(self.dnsmasqfile))
         shutil.copyfile(self.rospack.get_path('rosdop') + "/dnsmasq/ros-tmp-hosts", dst=self.dnsmasqfile)
 
-        while not rosparam.get_param("{}/Ready".format(self.DMI.master_handle)):
-            rospy.logdebug("Waiting for master ready flag to be set to true.")
-            self.SMI.rate.sleep()
+        self.DMI.wait_on_param("Ready", message = "Waiting for master ready flag to be set to true.")
+
         self.DMI.update_from_master()
         host_list = []
         if not init:
