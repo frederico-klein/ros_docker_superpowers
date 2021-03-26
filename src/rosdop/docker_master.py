@@ -59,7 +59,7 @@ class DockerMasterInterface():
     def signal_death(self):
         rospy.logwarn("signal_death not initialized but called. you have an inconsistent behaviour in your code!")
 
-    def wait_on_param(self, param, message = "No message given.", tries = 100, check_if_inside = None):
+    def wait_on_param(self, param, message = "No message given.", tries = 100, check_if_inside = None, check_if = None):
         outparam = None
         realparamname = "{}/{}".format(self.master_handle, param)
         rospy.logdebug("wait_on_param reached")
@@ -70,8 +70,8 @@ class DockerMasterInterface():
                 outparam = rosparam.get_param(realparamname)
                 rospy.logdebug("{}: {}".format(realparamname, outparam))
                 #rospy.logdebug("all params: {}".format(rosparam.list_params("/")))
-                if check_if_inside is None or check_if_inside in outparam:
-                    rospy.logdebug("found it. ")
+                if check_if_inside is None or check_if_inside in outparam or check_if:
+                    rospy.logdebug("found it/ condition met. ")
                     break
                 else:
                     rospy.logdebug(message)
@@ -101,7 +101,7 @@ class DockerMasterInterface():
         if self.master_handle is not None:
             rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
             try:
-                self.wait_on_param("Ready", "Waiting for master ready flag to be set to true.")
+                self.wait_on_param("Ready", "Waiting for master ready flag to be set to true.", check_if = True)
                 self.update_from_master()
 
                 self.master.UseDnsMasq = rosparam.get_param("{}/UseDnsMasq".format(self.master_handle))
@@ -198,7 +198,7 @@ class DockerMasterInterface():
     def addHost(self,TubName, HostName, IP):
         rospy.loginfo("Service add host called.")
         ## attempt at solving a run issue that happens in the initialization
-        self.wait_on_param("DNS_Ready")
+        self.wait_on_param("DNS_Ready", check_if = True)
 
         self.add_host(TubName, HostName, IP)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))

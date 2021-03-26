@@ -47,7 +47,7 @@ class DnsMasqTub(Tub):
         rospy.logdebug("generating file {}".format(self.dnsmasqfile))
         shutil.copyfile(self.rospack.get_path('rosdop') + "/dnsmasq/ros-tmp-hosts", dst=self.dnsmasqfile)
 
-        self.DMI.wait_on_param("Ready", message = "Waiting for master ready flag to be set to true.")
+        self.DMI.wait_on_param("Ready", message = "Waiting for master ready flag to be set to true.", check_if = True)
 
         self.DMI.update_from_master()
         host_list = []
