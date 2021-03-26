@@ -4,6 +4,7 @@
 import rospy
 import rosnode
 import rosparam
+from rosgraph.masterapi import MasterError
 
 from utils import DockerLoggedNamed
 from std_srvs.srv import Empty, EmptyResponse
@@ -58,6 +59,32 @@ class DockerMasterInterface():
     def signal_death(self):
         rospy.logwarn("signal_death not initialized but called. you have an inconsistent behaviour in your code!")
 
+    def wait_on_param(self, param, message = "No message given.", tries = 100, check_if_inside = None):
+        outparam = None
+        realparamname = "{}/{}".format(self.master_handle, param)
+        while (tries> 0):
+            try:
+                outparam = rosparam.get_param(realparamname)
+            except MasterError as ma:
+                ## this is fine. it means the parameter is not there yet, which we expect
+                tries -= 1
+                rospy.logdebug(f"waiting on param {realparamname}")
+                rospy.logdebug(message)
+                self.rate.sleep()
+            except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
+                rospy.logerr("Unexpected! {}".format(e))
+
+            if check_if_inside is not None:
+                ## check_if_inside will be a string and we want to see if it is inside outparam
+                rospy.logdebug(f"{realparamname}, {outparam}")
+                if check_if_inside in outparam:
+                    break
+                else:
+                    rospy.logdebug(message)
+        if outparam is None:
+            rospy.logerr(f"Could not get param {realparamname}")
+        return outparam
+
     def __init__(self, level, dns_check = True):
         self.master = DockerMaster()
         self.rate = rospy.Rate(1)
@@ -69,9 +96,7 @@ class DockerMasterInterface():
         if self.master_handle is not None:
             rospy.wait_for_service('//{}/add_volume'.format(self.master_handle))
             try:
-                while not rosparam.get_param("{}/Ready".format(self.master_handle)):
-                    rospy.logdebug("Waiting for master ready flag to be set to true.")
-                    self.rate.sleep()
+                self.wait_on_param("Ready", "Waiting for master ready flag to be set to true.")
                 self.update_from_master()
 
                 self.master.UseDnsMasq = rosparam.get_param("{}/UseDnsMasq".format(self.master_handle))
@@ -106,11 +131,9 @@ class DockerMasterInterface():
             except rospy.ServiceException as e:
                 rospy.logfatal("Service call failed: %s"%e)
                 raise Exception
+
         if dns_check:
-            while(not rosparam.get_param("{}/dnsmasqIP".format(self.master_handle))):
-                rospy.loginfo_once("Waiting for dns to be present.")
-                self.rate.sleep()
-            self.dnsmasqIP = rosparam.get_param("{}/dnsmasqIP".format(self.master_handle))
+            self.dnsmasqIP = self.wait_on_param("dnsmasqIP", "Waiting for dns to be present.")
 
         rospy.loginfo("DMI init OK. ")
 
@@ -121,41 +144,14 @@ class DockerMasterInterface():
 
     def get_ws_volume_by_name(self,name, tries = 10):
 
-        try:
-            ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
-            while tries >0:
-                ###It doesnt make sense not to update this. Idk what I was thinking
-                self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
-                rospy.logdebug("VolumeDic: {}".format(self.master.TubVolumeDic))
-                if len(self.master.TubVolumeDic) != 0 and name in self.master.TubVolumeDic:
-                    break
-                else:
-                    tries -= 1
-                    rospy.logwarn("Volume List is empty or does not contain desired volume. Have you mounted a volume yet?")
-                    self.rate.sleep()
-        except rospy.ROSException as e:
-            rospy.logerr("Unexpected! {}".format(e))
-
+        self.master.TubVolumeDic = self.wait_on_param("TubVolumeDic", message = "Volume List is empty or does not contain desired volume. Have you mounted a volume yet?",
+                                                        tries = tries, check_if_inside = name)
         return self.master.TubVolumeDic[name]
 
     def get_ws_host_by_name(self,name, tries = 10):
-
-        try:
-            ### if everything is loaded at once this thing here is failing. I probably need to add some more clever stops somewhere else. Now I will make it sleep
-            while tries >0:
-                ###It doesnt make sense not to update this. Idk what I was thinking
-                self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
-                if len(self.master.HostDic) != 0 and name in self.master.HostDic:
-                    break
-                else:
-                    tries -= 1
-                    rospy.logwarn("Volume List is empty or does not contain desired host. Have you initiated a host yet?")
-                    self.rate.sleep()
-        except rospy.ROSException as e:
-            rospy.logerr("Unexpected! {}".format(e))
-
+        self.master.HostDic = self.wait_on_param("HostDic", message = "Volume List is empty or does not contain desired host. Have you initiated a host yet?",
+                                                    tries = tries, check_if_inside = name)
         return self.master.HostDic[name]
-
 
     def get_master(self):
         tries = 10
@@ -196,6 +192,9 @@ class DockerMasterInterface():
 
     def addHost(self,TubName, HostName, IP):
         rospy.loginfo("Service add host called.")
+        ## attempt at solving a run issue that happens in the initialization
+        self.wait_on_param("DNS_Ready")
+
         self.add_host(TubName, HostName, IP)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
@@ -206,40 +205,16 @@ class DockerMasterInterface():
 
     def close_handle(self,req):
           try:
-    #          # self.close()
-    #          self.rate,sleep()
-    #          self.rate,sleep()
-    #          self.rate,sleep()
-    #          self.rate,sleep()
               rospy.signal_shutdown("Indirectly closed.")
           except:
               pass
           return EmptyResponse()
 
     def close(self):
-    #
-    #     ##first close everyone but self
-    #     ###compile list of DMIs to kill:
-    #     rospy.logwarn("removing all other dmis:")resolver.query
-    #     dmi_list = rosparam.get_param("{}/allDMIs".format(self.master_handle))
-    #     ##do a set difference to get everone but self:
-    #     dmis_to_kill = set(dmi_list)-set(self.node_name)
-    #     rospy.logwarn("list of dmis to remove:{}".format(dmis_to_kill))
-    #     for dmi_handle in dmis_to_kill:
-    #         try:
-    #             rospy.ServiceProxy(dmi_handle,Empty)()
-    #         except:
-    #             rospy.logwarn("could not kill {}".format(dmi_handle))
-    #     ##then close master.
-    #     rospy.logwarn("Sending signal for master to die.")
         try:
             self.signal_death()
         except:
-            #when does this fail? if master is already closed. it shouldn't happen, but I suppose we should catch it.
             rospy.logerr("Master already dead! This shouldn't happen")
-
-    #
-    #     rospy.signal_shutdown("Ended Okay. Bye!")
 
 class DockerMaster(DockerLoggedNamed):
     """
@@ -267,6 +242,7 @@ class DockerMaster(DockerLoggedNamed):
     def __enter__(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
         rospy.set_param("~Ready", False)
+        rospy.set_param("~DNS_Ready", False)
         self.updateHostName()
 
         ### I will want to keep a list of volumes, nodes and bridges.
@@ -276,8 +252,6 @@ class DockerMaster(DockerLoggedNamed):
         # I am probably going to read this line over and be upset (why didn't I do this sooner?)
         # because you didn't know you were going to need it.
 
-        ##Right now I just want a list of Tubvolumes:
-        #self.TubVolumeDic = {}
         self.signal_kill_dmis = {}
 
         self.rate = rospy.Rate(1)
@@ -286,7 +260,7 @@ class DockerMaster(DockerLoggedNamed):
         rospy.set_param("~dnsmasqIP",self.dnsmasqIP)
         rospy.set_param("~HostDic",self.HostDic)
         rospy.set_param("~docker_hosts",self.DockerHosts)
-        ##this is dirty! I dont understand why I did it like this anymore. this needs cleaning
+        ##TODO: cleanup, consistency!
         self.afps("UseDnsMasq","use_dnsmasq")
         rospy.set_param("~UseDnsMasq",self.UseDnsMasq)
 
@@ -301,19 +275,13 @@ class DockerMaster(DockerLoggedNamed):
         # self.registerDMI = rospy.Service('~register_dmi', GenericString, self.handle_register_dmi)
         self.registerDMI = rospy.Service('~register_dmi', DMILevel, self.handle_register_dmi)
 
-
-
-        #rospy.set_param("~TubVolumeDic",[])
-
         rospy.set_param("~Ready", True) ### this needs toi be before the setup_dnsmasq or it will enter in a deadlock
 
         if self.UseDnsMasq:
             self.setup_dnsmasq()
 
-
         # TODO: make parameter?
         self.resolver.nameservers=["192.168.0.1"]#[socket.gethostbyname('ns1.cisco.com')]
-
 
     def setup_dnsmasq(self):
         rospy.logwarn("dnsmasq set!")
@@ -327,6 +295,7 @@ class DockerMaster(DockerLoggedNamed):
         self.update_hosts_DNS = rospy.ServiceProxy(dnsmasq_update_service_string_handle, Empty)
         self.dns_ready = True
         rospy.logwarn("dnsmasq finished setting up")
+        rospy.set_param("~DNS_Ready", True)
 
     # def handle_register_dmi(self,req):
     #     signal_kill_dmis_string_handle = '{}/perish'.format(req.MyString)
@@ -348,7 +317,6 @@ class DockerMaster(DockerLoggedNamed):
         rospy.logwarn("update hosts called")
         self.update_hosts()
         rospy.logwarn("update hosts ended okay")
-
         return EmptyResponse()
 
     def update_hosts(self):

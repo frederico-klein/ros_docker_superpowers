@@ -124,4 +124,6 @@ on every docker host and in every container,
 
 ##actually running the nodes:
 
-   now everything should be fine to start the nodes
+now everything should be fine to start the nodes:
+
+   roslaunch ros_example_torch_classifier sm.launch
