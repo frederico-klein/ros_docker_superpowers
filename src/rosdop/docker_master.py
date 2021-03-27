@@ -34,6 +34,10 @@ class Error(Exception):
     """Base class for exceptions in this module."""
     pass
 
+class UnknownError(Error):
+    def __init__(self, message):
+        rospy.signal_shutdown(message)
+
 class NoMaster(Error):
     """Exception raised for errors in the input.
 
@@ -45,6 +49,18 @@ class NoMaster(Error):
     def __init__(self):
         self.message = "No Master"
         rospy.signal_shutdown(self.message)
+
+def safeServiceCall(serv, arg_list):
+    try:
+        serv(*arg_list)
+    except rospy.ServiceException as e:
+        ## why can't it do this?
+        ##maybe master is dead. parameters stay in the core after a node has signed off, so we can check for this!
+        if self.wait_on_param("Alive", check_if = False):
+            rospy.signal_shutdown("Master process ended. Closing...")
+        else:
+            ##then I don't know, so we raise
+            raise UnknownError("Some ServiceException: %s"%e)
 
 class DockerMasterInterface():
     def update_from_master(self):
@@ -133,7 +149,7 @@ class DockerMasterInterface():
                 #mySrvCall.Level = level
                 #mySrvCall.DMIName = self.node_name
                 #self.register_dmi(mySrvCall)
-                if level>0:
+                if self.aliveLevel >0:
                     rospy.logwarn("DMI registered as essential. Any error here will shutdown docker_master and all DMI linked nodes!")
                     self.signal_death = rospy.ServiceProxy('{}/die'.format(self.master_handle), Empty)
                     self.perishSrv = rospy.Service('~perish', Empty, self.close_handle)
@@ -198,12 +214,12 @@ class DockerMasterInterface():
         return None
     def addVolume(self,VolumeName, WsPath):
         rospy.loginfo("Service add volume called.")
-        self.add_vol(VolumeName, WsPath)
+        safeServiceCall(self.add_vol, (VolumeName, WsPath))
         self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
 
     def rmVolume(self,VolumeName):
         rospy.loginfo("Service rm volume called.")
-        self.rm_vol(VolumeName)
+        safeServiceCall(self.rm_vol, (VolumeName))
         self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
 
     def addHost(self,TubName, HostName, IP):
@@ -216,12 +232,14 @@ class DockerMasterInterface():
         else:
             self.wait_on_param("DNS_Ready", check_if = True)
 
-        self.add_host(TubName, HostName, IP)
+        safeServiceCall(self.add_host, [TubName, HostName, IP])
+
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
     def rmHost(self,TubName, HostName):
         rospy.loginfo("Service rm host called.")
-        self.rm_host(TubName, HostName)
+        safeServiceCall(self.rm_host, [(TubName, HostName])
+        #self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
     def close_handle(self,req):
@@ -262,6 +280,7 @@ class DockerMaster(DockerLoggedNamed):
 
     def __enter__(self):
         rospy.init_node('docker_master', anonymous=False, log_level=rospy.DEBUG)
+        rospy.set_param("~Alive", True)
         rospy.set_param("~Ready", False)
         rospy.set_param("~DNS_Ready", False)
         self.updateHostName()
@@ -352,7 +371,12 @@ class DockerMaster(DockerLoggedNamed):
         self.DockerHosts = HostList
         rospy.set_param("~docker_hosts", self.DockerHosts)
         if self.UseDnsMasq and self.dns_ready:
-            self.update_hosts_DNS()
+            try:
+                self.update_hosts_DNS()
+            except rospy.ServiceException as e:
+                rospy.logdebug(e)
+                rospy.logerr("Could not update the DNS. Is rosmasqdns working?")
+                ## this happens when the DNS is already closed and we are trying to update the server.
         rospy.loginfo("Current known list of hosts: {}".format(self.DockerHosts))
 
     def handle_add_volume(self,req):
@@ -409,6 +433,7 @@ class DockerMaster(DockerLoggedNamed):
     def  __exit__(self, *exc):
         rospy.loginfo("Shutting down. Waiting for other processes to close") ## this is a lie and it will fail if anything takes less than N seconds to close. I need to actually do this, hook them and then get the closure notice
         self.keep_alive = False
+        rospy.set_param("~Alive", False)
 
 def parse_dic_into_tree(dic_dic):
     currlevel = 0
