@@ -51,6 +51,7 @@ class DockerLogged(object):
         old logged_subprocess_popen
         """
         tries = num_retries
+        message = ""
         while tries>0:
             rospy.logdebug("command being run:\n\n{}\n\n".format(" ".join(list_args)))
             proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -66,15 +67,17 @@ class DockerLogged(object):
                 else:
                     rospy.logdebug("COMMAND: \n{}\n Did not work yet. Maybe try again in a sec?\nRESPONSE stdout: {}\nerrout: {}".format(list_args, output, errorout))
                     if proc.returncode is not 0:
-                        rospy.logdebug(repr(traceback.format_stack()))
+                        message = " ".join(repr(traceback.format_stack()))
+                        try:
+                            rospy.logdebug_once(message) ##I think this is new.
+                        except:
+                            rospy.logdebug(message)
             else:
                 break
             rospy.sleep(1)
 
         if proc.returncode is not 0:
-            formatted_lines = traceback.format_exc().splitlines()
-            for a_line in formatted_lines:
-                rospy.logerr(a_line)
+            rospy.logerr(message)
             rospy.logerr(errorout)
             rospy.signal_shutdown(errorout)
         rospy.logdebug("output:\n{}".format(output))
