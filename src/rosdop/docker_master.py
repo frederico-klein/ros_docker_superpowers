@@ -83,6 +83,14 @@ class DockerMasterInterface():
         realparamname = "{}/{}".format(self.master_handle, param)
         rospy.logdebug("wait_on_param reached")
         rospy.logdebug(realparamname)
+        def retry():
+            rospy.logdebug(message)
+            tries -= 1
+            self.rate.sleep()
+            ##it's useless to retry if master is dead, so:
+            if param is not "Alive" and self.wait_on_param("Alive", check_if = False, tries=1):
+                rospy.signal_shutdown("Master process ended. Closing...")
+            return
         while (tries> 0):
             try:
                 rospy.logdebug("trying to read param: {}".format(realparamname))
@@ -97,22 +105,16 @@ class DockerMasterInterface():
                         rospy.logdebug("parameter set. ")
                         break
                     else:
-                        rospy.logdebug(message)
-                        tries -= 1
-                        self.rate.sleep()
+                        retry()
                 elif check_if_inside in outparam :
                     rospy.logdebug("found it. ")
                     break
                 else:
-                    rospy.logdebug(message)
-                    tries -= 1
-                    self.rate.sleep()
+                    retry()
             except MasterError as ma:
                 ## this is fine. it means the parameter is not there yet, which we expect
-                tries -= 1
                 rospy.logdebug("waiting on param {}".format(realparamname))
-                rospy.logdebug(message)
-                self.rate.sleep()
+                retry()
             except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
                 rospy.logerr("Unexpected! {}".format(e))
 
