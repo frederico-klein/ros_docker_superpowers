@@ -149,7 +149,7 @@ class Tub(DockerLoggedNamed):
             self.created = True
             self.lspPopen(flatten(proc_list))
 
-        rospy.loginfo("===================================\n\nContainer {} should be running now.\n\n======================================".format(self.TubName+"."+self.ownHostName))
+        rospy.loginfo("\n===================================\n\nContainer {} should be running now.\n\n======================================".format(self.TubName+"."+self.ownHostName))
         self.running = True
 
     def get_dns(self):

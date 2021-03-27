@@ -79,19 +79,20 @@ class DockerMasterInterface():
         rospy.logwarn("signal_death not initialized but called. you have an inconsistent behaviour in your code!")
 
     def wait_on_param(self, param, message = "No message given.", tries = 100, check_if_inside = None, check_if = None):
+        num_tries = tries
         outparam = None
         realparamname = "{}/{}".format(self.master_handle, param)
         rospy.logdebug("wait_on_param reached")
         rospy.logdebug(realparamname)
-        def retry():
+        def retry(tries):
             rospy.logdebug(message)
             tries -= 1
             self.rate.sleep()
             ##it's useless to retry if master is dead, so:
             if param is not "Alive" and self.wait_on_param("Alive", check_if = False, tries=1):
                 rospy.signal_shutdown("Master process ended. Closing...")
-            return
-        while (tries> 0):
+            return tries
+        while (num_tries> 0):
             try:
                 rospy.logdebug("trying to read param: {}".format(realparamname))
                 outparam = rosparam.get_param(realparamname)
@@ -105,16 +106,16 @@ class DockerMasterInterface():
                         rospy.logdebug("parameter set. ")
                         break
                     else:
-                        retry()
+                        num_tries = retry(num_tries)
                 elif check_if_inside in outparam :
                     rospy.logdebug("found it. ")
                     break
                 else:
-                    retry()
+                    num_tries = retry(num_tries)
             except MasterError as ma:
                 ## this is fine. it means the parameter is not there yet, which we expect
                 rospy.logdebug("waiting on param {}".format(realparamname))
-                retry()
+                num_tries = retry(num_tries)
             except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
                 rospy.logerr("Unexpected! {}".format(e))
 
