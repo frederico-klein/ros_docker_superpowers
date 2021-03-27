@@ -60,11 +60,12 @@ class DockerMasterInterface():
         except rospy.ServiceException as e:
             ## why can't it do this?
             ##maybe master is dead. parameters stay in the core after a node has signed off, so we can check for this!
-            if self.wait_on_param("Alive", check_if = False):
+            if not self.wait_on_param("Alive", check_if = False):
                 rospy.signal_shutdown("Master process ended. Closing...")
             else:
                 ##then I don't know, so we raise
-                raise UnknownError("Some ServiceException: %s"%e)
+                errormessage = "Some ServiceException: %s"%e
+                raise UnknownError(errormessage)
 
     def update_from_master(self):
         ###all parameters
@@ -89,7 +90,7 @@ class DockerMasterInterface():
             tries -= 1
             self.rate.sleep()
             ##it's useless to retry if master is dead, so:
-            if param is not "Alive" and self.wait_on_param("Alive", check_if = False, tries=1):
+            if param is not "Alive" and rosparam.get_param("{}/Alive".format(self.master_handle)) == False:
                 rospy.signal_shutdown("Master process ended. Closing...")
             return tries
         while (num_tries> 0):
