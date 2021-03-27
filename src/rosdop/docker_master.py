@@ -50,19 +50,22 @@ class NoMaster(Error):
         self.message = "No Master"
         rospy.signal_shutdown(self.message)
 
-def safeServiceCall(serv, arg_list):
-    try:
-        serv(*arg_list)
-    except rospy.ServiceException as e:
-        ## why can't it do this?
-        ##maybe master is dead. parameters stay in the core after a node has signed off, so we can check for this!
-        if self.wait_on_param("Alive", check_if = False):
-            rospy.signal_shutdown("Master process ended. Closing...")
-        else:
-            ##then I don't know, so we raise
-            raise UnknownError("Some ServiceException: %s"%e)
+
 
 class DockerMasterInterface():
+
+    def safeServiceCall(self, serv, arg_list):
+        try:
+            serv(*arg_list)
+        except rospy.ServiceException as e:
+            ## why can't it do this?
+            ##maybe master is dead. parameters stay in the core after a node has signed off, so we can check for this!
+            if self.wait_on_param("Alive", check_if = False):
+                rospy.signal_shutdown("Master process ended. Closing...")
+            else:
+                ##then I don't know, so we raise
+                raise UnknownError("Some ServiceException: %s"%e)
+
     def update_from_master(self):
         ###all parameters
         all_pars = rosparam.get_param(self.master_handle)
@@ -214,12 +217,12 @@ class DockerMasterInterface():
         return None
     def addVolume(self,VolumeName, WsPath):
         rospy.loginfo("Service add volume called.")
-        safeServiceCall(self.add_vol, (VolumeName, WsPath))
+        self.safeServiceCall(self.add_vol, (VolumeName, WsPath))
         self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
 
     def rmVolume(self,VolumeName):
         rospy.loginfo("Service rm volume called.")
-        safeServiceCall(self.rm_vol, (VolumeName))
+        self.safeServiceCall(self.rm_vol, (VolumeName))
         self.master.TubVolumeDic = rosparam.get_param("{}/TubVolumeDic".format(self.master_handle))
 
     def addHost(self,TubName, HostName, IP):
@@ -232,13 +235,13 @@ class DockerMasterInterface():
         else:
             self.wait_on_param("DNS_Ready", check_if = True)
 
-        safeServiceCall(self.add_host, [TubName, HostName, IP])
+        self.safeServiceCall(self.add_host, [TubName, HostName, IP])
 
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
     def rmHost(self,TubName, HostName):
         rospy.loginfo("Service rm host called.")
-        safeServiceCall(self.rm_host, [TubName, HostName])
+        self.safeServiceCall(self.rm_host, [TubName, HostName])
         #self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 

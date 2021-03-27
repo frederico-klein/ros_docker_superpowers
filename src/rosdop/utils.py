@@ -52,7 +52,7 @@ class DockerLogged(object):
         """
         tries = num_retries
         while tries>0:
-            rospy.logdebug("command being run:{}".format(list_args))
+            rospy.logdebug("command being run:\n\n{}\n\n".format(" ".join(list_args)))
             proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             res = proc.communicate()
             # output = proc.stdout.read()

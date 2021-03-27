@@ -146,7 +146,6 @@ class Tub(DockerLoggedNamed):
                  self.get_entrypoint()
              ]
             #print(self.FullName())
-            print(flatten(proc_list))
             self.created = True
             self.lspPopen(flatten(proc_list))
 
