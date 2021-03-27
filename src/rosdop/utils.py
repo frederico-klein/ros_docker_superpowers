@@ -67,7 +67,7 @@ class DockerLogged(object):
                 else:
                     rospy.logdebug("COMMAND: \n{}\n Did not work yet. Maybe try again in a sec?\nRESPONSE stdout: {}\nerrout: {}".format(list_args, output, errorout))
                     if proc.returncode is not 0:
-                        message = " ".join(repr(traceback.format_stack()))
+                        message = " ".join(traceback.format_stack())
                         try:
                             rospy.logdebug_once(message) ##I think this is new.
                         except:
