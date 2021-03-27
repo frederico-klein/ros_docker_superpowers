@@ -72,7 +72,8 @@ class DockerLogged(object):
             rospy.sleep(1)
 
         if proc.returncode is not 0:
-            for a_line in repr(traceback.format_stack()):
+            formatted_lines = traceback.format_exc().splitlines()
+            for a_line in formatted_lines:
                 rospy.logerr(a_line)
             rospy.logerr(errorout)
             rospy.signal_shutdown(errorout)
