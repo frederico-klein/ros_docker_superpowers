@@ -238,7 +238,7 @@ class DockerMasterInterface():
 
     def rmHost(self,TubName, HostName):
         rospy.loginfo("Service rm host called.")
-        safeServiceCall(self.rm_host, [(TubName, HostName])
+        safeServiceCall(self.rm_host, [TubName, HostName])
         #self.rm_host(TubName, HostName)
         self.master.HostDic = rosparam.get_param("{}/HostDic".format(self.master_handle))
 
