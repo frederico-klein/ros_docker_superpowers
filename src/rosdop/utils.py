@@ -125,8 +125,9 @@ class DockerLogged(object):
         message = ""
         output = ""
         errorout = ""
+        command_str = " ".join(list_args)
         while tries>0:
-            rospy.logdebug("command being run:\n\n{}\n\n".format(" ".join(list_args)))
+            rospy.logdebug("command being run:\n\n{}\n\n".format(command_str))
             proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             proc.wait()
             output, errorout = proc.communicate()
@@ -134,7 +135,7 @@ class DockerLogged(object):
             #output = res[0]
             #errorout = res[1] # I think
             # output = proc.stdout.read()
-            
+
             rospy.logdebug("process response: {}".format(output))
 
             tries-=1
@@ -151,7 +152,7 @@ class DockerLogged(object):
 
         if proc.returncode is not 0:
             raise ShellExecutionError(message, errorout)
-        rospy.logdebug("output:\n{}".format(output))
+        rospy.loginfo("\nlspPopen Command:\n{}\noutput:\n{}".format(command_str,output))
         self.proc_list.append(proc)
         return (output, proc) ### i probably should catch all of those procs and kill them in the end.
 
