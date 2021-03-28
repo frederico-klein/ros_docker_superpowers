@@ -145,6 +145,7 @@ class Tub(DockerLoggedNamed):
             while not self.DMI.dnsmasqIP:
                 rospy.loginfo_throttle(3,"dnsmasqIP not set, updating from master")
                 self.DMI.update_from_master()
+                rospy.logwarn(self.DMI.dnsmasqIP)
                 thisrate.sleep()
             return ["--dns",self.DMI.dnsmasqIP]
         else:
