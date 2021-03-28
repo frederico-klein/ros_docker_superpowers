@@ -6,7 +6,7 @@ import rosnode
 import rosparam
 from rosgraph.masterapi import MasterError
 
-from utils import DockerLoggedNamed
+from utils import DockerLoggedNamed, logstack
 from std_srvs.srv import Empty, EmptyResponse
 from rosdop.srv import addVolume, addVolumeResponse
 from rosdop.srv import RmVolume, RmVolumeResponse
@@ -88,6 +88,7 @@ class DockerMasterInterface():
         rospy.logdebug(realparamname)
         def retry(tries):
             rospy.logdebug(message)
+            logstack()
             tries -= 1
             self.rate.sleep()
             ##it's useless to retry if master is dead, so:
