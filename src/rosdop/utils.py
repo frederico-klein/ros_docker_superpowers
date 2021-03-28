@@ -62,6 +62,8 @@ def wait_on_param(param, message = "No message given.", tries = 100, check_if_in
                 num_tries = retry(num_tries)
         except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
             rospy.logerr("Unexpected! {}".format(e))
+        except rospy.ROSInterruptException:
+            break
 
     if outparam is None:
         rospy.logerr("Could not get param: {}".format(realparamname))
