@@ -7,18 +7,8 @@
 
 import rospy
 from std_srvs.srv import Empty, EmptyResponse
-from utils import DockerLoggedNamed
+from utils import DockerLoggedNamed, flatten
 from docker_master import DockerMasterInterface as DMI
-
-def flatten(nl):
-    listA = []
-    for item in nl:
-        if isinstance(item,list):
-            listA.extend(flatten(item))
-        else:
-            listA.append(item)
-    return listA
-
 
 class Tub(DockerLoggedNamed):
     """
@@ -56,10 +46,7 @@ class Tub(DockerLoggedNamed):
         self.created = False
         rospy.init_node('docker_tub', anonymous=True, log_level=rospy.DEBUG)
 
-
         self.updateHostName()
-
-
 
     def reset(self,req):
         rospy.loginfo("dockertub reset service called.")

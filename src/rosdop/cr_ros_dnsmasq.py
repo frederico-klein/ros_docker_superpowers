@@ -6,6 +6,7 @@ import os, shutil
 import rospkg
 import rosparam
 from DockerTub import Tub
+from utils import logstack, wait_on_param
 from std_srvs.srv import Empty
 
 class DnsMasqTub(Tub):
@@ -14,6 +15,8 @@ class DnsMasqTub(Tub):
 
     def post_init(self): ## makes sure the object always exists.
         super(DnsMasqTub, self).post_init()
+        self.restarting = rospy.set_param("restarting", "False")
+
         self.rospack = rospkg.RosPack()
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
 
@@ -67,6 +70,11 @@ class DnsMasqTub(Tub):
 
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it
+        wait_on_param("restarting", check_if = False)
+        self.restarting = True
+        rospy.set_param("restarting", self.restarting)
+
+        logstack()
         rospy.loginfo("=========RESET ISSUED========")
         rospy.loginfo("=========NOW CLOSING DNS========")
         self.close(silent = False, reset = True)
@@ -74,6 +82,9 @@ class DnsMasqTub(Tub):
         rospy.loginfo("=========NOW CREATING DNS AGAIN========")
         self.create(ready_flag = "Ready")
         rospy.loginfo("=========ALL DONE========")
+
+        self.restarting = False
+        rospy.set_param("restarting", self.restarting)
 
     def get_dns(self): ##I am providing the dns here. we don't want a loop
         return []

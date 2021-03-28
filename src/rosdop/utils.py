@@ -1,12 +1,71 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import rospy
+import rospy, rosparam
 import subprocess
 import socket
 import traceback
 
 #import re
+
+def logstack():
+    message = " ".join(traceback.format_stack())
+    try:
+        rospy.logdebug_once(message) ##I think this is new.
+    except:
+        rospy.logdebug(message)
+    return message
+
+def flatten(nl):
+    listA = []
+    for item in nl:
+        if isinstance(item,list):
+            listA.extend(flatten(item))
+        else:
+            listA.append(item)
+    return listA
+
+def wait_on_param(param, message = "No message given.", tries = 100, check_if_inside = None, check_if = None):
+    num_tries = tries
+    outparam = None
+    realparamname = "~{}".format(param)
+    rospy.logdebug("Local node wait_on_param reached")
+    rospy.logdebug(realparamname)
+    def retry(tries):
+        rospy.logdebug(message)
+        tries -= 1
+        self.rate.sleep()
+        ##it's useless to retry if master is dead, so:
+        if param is not "Alive" and rospy.get_param("~Alive") == False:
+            rospy.signal_shutdown("Node process ended. Closing...")
+        return tries
+    while (num_tries> 0):
+        try:
+            rospy.logdebug("trying to read param: {}".format(realparamname))
+            outparam = rospy.get_param(realparamname)
+            rospy.logdebug("{}: {}".format(realparamname, outparam))
+            #rospy.logdebug("all params: {}".format(rosparam.list_params("/")))
+            if check_if_inside is None :
+                if outparam is check_if:
+                    rospy.logdebug("condition met. ")
+                    break
+                elif check_if is None:
+                    rospy.logdebug("parameter set. ")
+                    break
+                else:
+                    num_tries = retry(num_tries)
+            elif check_if_inside in outparam :
+                rospy.logdebug("found it. ")
+                break
+            else:
+                num_tries = retry(num_tries)
+        except rospy.ROSException as e: ## maybe it will collide with the thing on top, needs checking.
+            rospy.logerr("Unexpected! {}".format(e))
+
+    if outparam is None:
+        rospy.logerr("Could not get param: {}".format(realparamname))
+    return outparam
+
 
 class DockerLogged(object):
 
@@ -67,11 +126,7 @@ class DockerLogged(object):
                 else:
                     rospy.logdebug("COMMAND: \n{}\n Did not work yet. Maybe try again in a sec?\nRESPONSE stdout: {}\nerrout: {}".format(list_args, output, errorout))
                     if proc.returncode is not 0:
-                        message = " ".join(traceback.format_stack())
-                        try:
-                            rospy.logdebug_once(message) ##I think this is new.
-                        except:
-                            rospy.logdebug(message)
+                         message = logstack()
             else:
                 break
             rospy.sleep(1)
