@@ -76,7 +76,7 @@ class DnsMasqTub(Tub):
         wait_on_param("Ready", check_if = True)
         self.Ready = False
         rospy.set_param("Ready", self.Ready)
-        self.lock.aquire()
+        self.lock.acquire()
 
         logstack()
         rospy.loginfo("=========RESET ISSUED========")
