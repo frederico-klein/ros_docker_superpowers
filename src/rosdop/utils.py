@@ -37,8 +37,8 @@ def wait_on_param(param, message = "No message given.", tries = 100, check_if_in
         tries -= 1
         rate.sleep()
         ##it's useless to retry if master is dead, so:
-        if param is not "Alive" and rospy.get_param("~Alive") == False:
-            rospy.signal_shutdown("Node process ended. Closing...")
+        #if param is not "Alive" and rospy.get_param("~Alive") == False:
+        #    rospy.signal_shutdown("Node process ended. Closing...")
         return tries
     while (num_tries> 0):
         try:
