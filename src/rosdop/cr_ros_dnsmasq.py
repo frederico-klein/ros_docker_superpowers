@@ -86,8 +86,8 @@ class DnsMasqTub(Tub):
         rospy.loginfo("=========NOW CREATING DNS AGAIN========")
         self.create(ready_flag = "Ready")
         rospy.loginfo("=========ALL DONE========")
-
         self.lock.release()
+
         self.Ready = True
         rospy.set_param("Ready", self.Ready)
 
