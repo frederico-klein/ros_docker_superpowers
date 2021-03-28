@@ -6,17 +6,23 @@ import os, shutil
 import rospkg
 import rosparam
 from DockerTub import Tub
+from utils import logstack, wait_on_param
 from std_srvs.srv import Empty
 
 class DnsMasqTub(Tub):
     def __init__(self):
         super(DnsMasqTub, self).__init__(1.5, dns_check = False)
+
+    def post_init(self): ## makes sure the object always exists.
+        super(DnsMasqTub, self).post_init()
+        self.Ready = rospy.set_param("~Ready", True)
+
         self.rospack = rospkg.RosPack()
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
 
         self.afps("RosDnsMasqPort","ros_dnsmasq_port", default_attribute=10053)
 
-        self.ros_msq_dir = "/tmp/ros_dnsmasq.d/"
+        self.ros_msq_dir = "/tmp/ros_dnsmasq.d"
         if not os.path.exists(self.ros_msq_dir):
             os.makedirs(self.ros_msq_dir)
         rospy.logdebug("Using auxiliary dnsmasq in {}".format(self.ros_msq_dir))
@@ -44,9 +50,8 @@ class DnsMasqTub(Tub):
         rospy.logdebug("generating file {}".format(self.dnsmasqfile))
         shutil.copyfile(self.rospack.get_path('rosdop') + "/dnsmasq/ros-tmp-hosts", dst=self.dnsmasqfile)
 
-        while not rosparam.get_param("{}/Ready".format(self.DMI.master_handle)):
-            rospy.logdebug("Waiting for master ready flag to be set to true.")
-            self.SMI.rate.sleep()
+        self.DMI.wait_on_param("Ready", message = "Waiting for master ready flag to be set to true.", check_if = True)
+
         self.DMI.update_from_master()
         host_list = []
         if not init:
@@ -65,8 +70,21 @@ class DnsMasqTub(Tub):
 
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it
-        self.close(silent = True, reset = True)
-        self.create()
+        wait_on_param("Ready", check_if = True)
+        self.Ready = False
+        rospy.set_param("Ready", self.Ready)
+
+        logstack()
+        rospy.loginfo("=========RESET ISSUED========")
+        rospy.loginfo("=========NOW CLOSING DNS========")
+        self.close(silent = False, reset = True)
+        #self.close(silent = True, reset = True)
+        rospy.loginfo("=========NOW CREATING DNS AGAIN========")
+        self.create(ready_flag = "Ready")
+        rospy.loginfo("=========ALL DONE========")
+
+        self.Ready = True
+        rospy.set_param("Ready", self.Ready)
 
     def get_dns(self): ##I am providing the dns here. we don't want a loop
         return []
@@ -89,8 +107,11 @@ def generate_string_list_for_dnsmasqfile_from_HostDic(HostDic):
 if __name__ == '__main__':
     try:
         dnsmasqTub = DnsMasqTub()
+        dnsmasqTub.post_init()
+        rospy.loginfo("RosDnsMasq seems OK.")
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
     finally:
-        dnsmasqTub.close()
+        if dnsmasqTub.created:
+            dnsmasqTub.close()

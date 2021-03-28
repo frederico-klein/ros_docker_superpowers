@@ -82,6 +82,8 @@ if __name__ == '__main__':
                                         iprange="172.28.5.0/24" ,
                                         gateway="172.28.5.254"  )
         myDockerBridge.create()
+        rospy.loginfo("ROS Docker Bridge seems OK.")
+
         rospy.spin()
     except rospy.ROSInterruptException:
         pass
