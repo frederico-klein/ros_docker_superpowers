@@ -28,13 +28,14 @@ def flatten(nl):
 def wait_on_param(param, message = "No message given.", tries = 100, check_if_inside = None, check_if = None):
     num_tries = tries
     outparam = None
+    rate = rospy.Rate(1)
     realparamname = "~{}".format(param)
     rospy.logdebug("Local node wait_on_param reached")
     rospy.logdebug(realparamname)
     def retry(tries):
         rospy.logdebug(message)
         tries -= 1
-        self.rate.sleep()
+        rate.sleep()
         ##it's useless to retry if master is dead, so:
         if param is not "Alive" and rospy.get_param("~Alive") == False:
             rospy.signal_shutdown("Node process ended. Closing...")
