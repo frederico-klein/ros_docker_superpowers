@@ -108,6 +108,7 @@ if __name__ == '__main__':
     try:
         dnsmasqTub = DnsMasqTub()
         dnsmasqTub.post_init()
+        rospy.loginfo("RosDnsMasq seems OK.")
         rospy.spin()
     except rospy.ROSInterruptException:
         pass

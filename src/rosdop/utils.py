@@ -25,6 +25,15 @@ def flatten(nl):
             listA.append(item)
     return listA
 
+class ShellExecutionError(Exception):
+    """Base class for exceptions in this module."""
+    def __init__(self, message, errorout):
+        self.message = message
+        self.errout = errorout
+        rospy.logerr(self.message)
+        rospy.logerr(self.errout)
+        rospy.signal_shutdown(self.errout)
+
 def wait_on_param(param, message = "No message given.", tries = 100, check_if_inside = None, check_if = None):
     num_tries = tries
     outparam = None
@@ -114,14 +123,20 @@ class DockerLogged(object):
         """
         tries = num_retries
         message = ""
+        output = ""
+        errorout = ""
         while tries>0:
             rospy.logdebug("command being run:\n\n{}\n\n".format(" ".join(list_args)))
             proc = subprocess.Popen(list_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            res = proc.communicate()
+            proc.wait()
+            output, errorout = proc.communicate()
+            #res = proc.communicate()
+            #output = res[0]
+            #errorout = res[1] # I think
             # output = proc.stdout.read()
-            output = res[0]
+            
             rospy.logdebug("process response: {}".format(output))
-            errorout = res[1] # I think
+
             tries-=1
             if with_retries:
                 if proc.returncode is 0:
@@ -132,12 +147,10 @@ class DockerLogged(object):
                          message = logstack()
             else:
                 break
-            rospy.sleep(1)
+            #rospy.sleep(1)
 
         if proc.returncode is not 0:
-            rospy.logerr(message)
-            rospy.logerr(errorout)
-            rospy.signal_shutdown(errorout)
+            raise ShellExecutionError(message, errorout)
         rospy.logdebug("output:\n{}".format(output))
         self.proc_list.append(proc)
         return (output, proc) ### i probably should catch all of those procs and kill them in the end.
