@@ -141,6 +141,11 @@ class Tub(DockerLoggedNamed):
 
     def get_dns(self):
         if self.DMI.master.UseDnsMasq:
+            thisrate = rospy.Rate(3)
+            while not self.DMI.dnsmasqIP:
+                rospy.loginfo_throttle(3,"dnsmasqIP not set, updating from master")
+                self.DMI.update_from_master()
+                thisrate.sleep()
             return ["--dns",self.DMI.dnsmasqIP]
         else:
             return []
