@@ -15,7 +15,7 @@ class DnsMasqTub(Tub):
 
     def post_init(self): ## makes sure the object always exists.
         super(DnsMasqTub, self).post_init()
-        self.restarting = rospy.set_param("restarting", "False")
+        self.restarting = rospy.set_param("~restarting", "False")
 
         self.rospack = rospkg.RosPack()
         self.updateHostSrv = rospy.Service('~upd_host', Empty, self.handle_update_host)
