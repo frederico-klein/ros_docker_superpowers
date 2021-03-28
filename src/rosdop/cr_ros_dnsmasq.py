@@ -8,10 +8,12 @@ import rosparam
 from DockerTub import Tub
 from utils import logstack, wait_on_param
 from std_srvs.srv import Empty
+from threading import Lock
 
 class DnsMasqTub(Tub):
     def __init__(self):
         super(DnsMasqTub, self).__init__(1.5, dns_check = False)
+        self.lock = Lock()
 
     def post_init(self): ## makes sure the object always exists.
         super(DnsMasqTub, self).post_init()
@@ -70,9 +72,11 @@ class DnsMasqTub(Tub):
 
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it
+        ###this does not really work.
         wait_on_param("Ready", check_if = True)
         self.Ready = False
         rospy.set_param("Ready", self.Ready)
+        self.lock.aquire()
 
         logstack()
         rospy.loginfo("=========RESET ISSUED========")
@@ -83,6 +87,7 @@ class DnsMasqTub(Tub):
         self.create(ready_flag = "Ready")
         rospy.loginfo("=========ALL DONE========")
 
+        self.lock.release()
         self.Ready = True
         rospy.set_param("Ready", self.Ready)
 
