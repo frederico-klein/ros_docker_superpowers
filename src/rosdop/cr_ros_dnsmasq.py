@@ -67,9 +67,13 @@ class DnsMasqTub(Tub):
 
     def restart_dnsmasq_docker(self):
         ##if there is a container running as dnsmasq I have to stop it
+        rospy.loginfo("=========RESET ISSUED========")
+        rospy.loginfo("=========NOW CLOSING DNS========")
         self.close(silent = False, reset = True)
         #self.close(silent = True, reset = True)
+        rospy.loginfo("=========NOW CREATING DNS AGAIN========")
         self.create(ready_flag = "Ready")
+        rospy.loginfo("=========ALL DONE========")
 
     def get_dns(self): ##I am providing the dns here. we don't want a loop
         return []
