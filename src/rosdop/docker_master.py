@@ -74,6 +74,7 @@ class DockerMasterInterface():
         for par,value in all_pars.iteritems():
             rospy.logdebug("{},{}".format(par,value))
             setattr(self.master, par, value)
+        self.dnsmasqIP = self.master.dnsmasqIP
         rospy.logdebug(dir(self.master))
 
     def signal_death(self):
